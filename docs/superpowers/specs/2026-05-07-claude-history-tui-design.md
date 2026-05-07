@@ -135,7 +135,7 @@ from the active provider.
 │   Debug auth flow       │ ▸ Bash: ls -la (12 lines)              │
 │   3d ago · 56 msgs      │                                        │
 └─────────────────────────┴────────────────────────────────────────┘
- ↑/↓ select   Enter focus preview   / search   p path   q quit
+ ↑/↓ select   Enter focus preview   / search   ⌃F search-in-preview   q quit
 ```
 
 - Left column fixed width: `min(36, floor(termWidth * 0.35))`.
@@ -167,6 +167,13 @@ Messages render top-down in chronological order. Each message has a header
 line (`<role> · <relative time>`) followed by the content. Long messages are
 not truncated by default — the user scrolls.
 
+**Initial scroll position is the bottom** — the most recent message is
+visible without any user action. This matches how chat clients open a
+conversation. The user scrolls up (`PgUp`, `Ctrl-u`, `k` while the preview
+has focus) to walk back through history. `g` jumps to the very first
+message; `G` jumps back to the latest. Whenever the user switches to a
+different session, the preview resets to bottom again.
+
 Rendering rules per role:
 
 - **user / assistant**: markdown rendered to ANSI (bold, italic, inline code,
@@ -176,11 +183,34 @@ Rendering rules per role:
 - **tool_use**: rendered collapsed as `▸ <toolName>: <one-line summary>`. The
   preview maintains an integer "active block index" pointing at one tool block
   at a time (defaulting to the first visible one). `Tab` toggles its expanded
-  state; `Shift-Tab` / `n` advances the active block index to the next tool
-  block in the message stream. Expanded view shows full input/output.
+  state; `Shift-Tab` advances the active block index to the next tool block
+  in the message stream. Expanded view shows full input/output.
 - **tool_result**: same collapsed convention; the result body is shown in dim
   color when expanded.
 - **system**: dim, italic, prefixed with `system`.
+
+### In-preview search
+
+While the right pane has focus the user can press `Ctrl-F` (the spec
+intentionally uses `Ctrl-F` rather than `Cmd-F` because most terminal
+emulators on macOS — Terminal.app, iTerm2, Ghostty — intercept `Cmd-F` for
+their own find dialog and never deliver it to the application; the footer
+hint advertises this as "⌃F search" so the binding is discoverable). A
+single-line search input slides in at the top of the preview pane.
+
+- Typing filters in real time. The preview highlights all matches in the
+  rendered text (inverse video on the matched substring) and auto-scrolls
+  to the first match at or after the current viewport top.
+- `Enter` commits the query and closes the input bar; the highlights stay
+  on screen.
+- `n` jumps to the next match below; `N` jumps to the previous match.
+  Both wrap around at the ends.
+- `Esc` clears the query, removes highlights, and returns the viewport to
+  where the user was before opening search.
+- Match logic: case-insensitive substring on the rendered text of each
+  message (post-markdown). Tool blocks are searched in their expanded form,
+  so a hit inside a collapsed tool block auto-expands that block when
+  jumped to.
 
 ## Keybindings
 
@@ -192,12 +222,15 @@ Rendering rules per role:
 | `Esc` / `←` / `h`    | preview     | move focus back to list                |
 | `PgUp` / `Ctrl-u`    | preview     | scroll up half a page                  |
 | `PgDn` / `Ctrl-d`    | preview     | scroll down half a page                |
-| `g` / `G`            | preview     | jump to top / bottom                   |
+| `g` / `G`            | preview     | jump to first / latest message         |
 | `Tab`                | preview     | toggle expand on active tool block     |
-| `Shift-Tab` / `n`    | preview     | move active tool block to next         |
-| `/`                  | list focus  | open search input                      |
-| `Esc`                | search      | close search, clear filter             |
-| `Enter`              | search      | apply filter, return to list focus     |
+| `Shift-Tab`          | preview     | move active tool block to next         |
+| `Ctrl-F`             | preview     | open in-preview search                 |
+| `n` / `N`            | preview     | next / previous search match           |
+| `Esc`                | preview     | exit search (clear query + highlights) |
+| `/`                  | list focus  | open list-search input                 |
+| `Esc`                | list-search | close search, clear filter             |
+| `Enter`              | list-search | apply filter, return to list focus     |
 | `p`                  | any         | switch to PathInput                    |
 | `q` / `Ctrl-c`       | any         | quit                                   |
 
