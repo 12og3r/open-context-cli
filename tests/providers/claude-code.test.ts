@@ -3,6 +3,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import os from "node:os";
 import { ClaudeCodeProvider } from "../../src/providers/claude-code.ts";
+import type { Message } from "../../src/providers/types.ts";
 
 const FIXTURES = path.resolve(__dirname, "../fixtures/claude-code");
 
@@ -42,5 +43,44 @@ describe("ClaudeCodeProvider.listSessions", () => {
     const tools = list.find(m => path.basename(m.filePath) === "with-tools.jsonl")!;
     // user + assistant (the tool_result is wrapped in a user line per Claude Code)
     expect(tools.messageCount).toBe(3);
+  });
+});
+
+async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
+  const out: T[] = [];
+  for await (const v of iter) out.push(v);
+  return out;
+}
+
+describe("ClaudeCodeProvider.loadSession", () => {
+  test("yields user, assistant, tool_use, and tool_result messages", async () => {
+    const root = await makeRoot();
+    const provider = new ClaudeCodeProvider();
+    const list = await provider.listSessions(root);
+    const tools = list.find(m => path.basename(m.filePath) === "with-tools.jsonl")!;
+    const messages = await collect<Message>(provider.loadSession(tools.filePath));
+    const roles = messages.map(m => m.role);
+    expect(roles).toEqual(["user", "assistant", "tool_use", "tool_result"]);
+    const toolUse = messages.find(m => m.role === "tool_use")!;
+    expect(toolUse.toolName).toBe("Bash");
+    expect(toolUse.content).toContain("ls -la");
+    const toolResult = messages.find(m => m.role === "tool_result")!;
+    expect(toolResult.content).toContain("file1");
+  });
+
+  test("skips malformed lines and yields surrounding messages", async () => {
+    const root = await makeRoot();
+    const list = await new ClaudeCodeProvider().listSessions(root);
+    const bad = list.find(m => path.basename(m.filePath) === "malformed.jsonl")!;
+    const messages = await collect<Message>(new ClaudeCodeProvider().loadSession(bad.filePath));
+    expect(messages.map(m => m.role)).toEqual(["user"]);
+  });
+
+  test("empty file yields zero messages", async () => {
+    const root = await makeRoot();
+    const list = await new ClaudeCodeProvider().listSessions(root);
+    const empty = list.find(m => path.basename(m.filePath) === "empty.jsonl")!;
+    const messages = await collect<Message>(new ClaudeCodeProvider().loadSession(empty.filePath));
+    expect(messages).toHaveLength(0);
   });
 });
