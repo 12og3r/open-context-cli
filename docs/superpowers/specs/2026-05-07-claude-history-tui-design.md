@@ -126,7 +126,7 @@ from the active provider.
 
 ```
 ┌─ Sessions (42) ─────────┬─ Preview ──────────────────────────────┐
-│ ▸ Building Ink TUI app  │ 👤 user · 2h ago         (cyan)        │
+│ ▸ Building Ink TUI app  │ 👨 user · 2h ago         (cyan)        │
 │   2h ago · 24 msgs      │ 我想做一款终端应用...                  │
 │ ─────────────────────── │                                        │
 │   Refactor parser       │ 🤖 assistant · 2h ago    (magenta)     │
@@ -181,7 +181,7 @@ default terminal color so code blocks etc. retain their natural styling.
 
 | Role         | Emoji | Header color | Body styling                           |
 |--------------|:-----:|--------------|----------------------------------------|
-| `user`       |  👤   | cyan, bold   | default (markdown → ANSI)              |
+| `user`       |  👨   | cyan, bold   | default (markdown → ANSI)              |
 | `assistant`  |  🤖   | magenta, bold | default (markdown → ANSI)             |
 | `tool_use`   |  🔧   | yellow       | collapsed one-liner; expanded = dim    |
 | `tool_result`|  📥   | gray         | collapsed one-liner; expanded = dim    |
