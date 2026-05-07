@@ -126,13 +126,13 @@ from the active provider.
 
 ```
 ┌─ Sessions (42) ─────────┬─ Preview ──────────────────────────────┐
-│ ▸ Building Ink TUI app  │ user · 2h ago                          │
+│ ▸ Building Ink TUI app  │ 👤 user · 2h ago         (cyan)        │
 │   2h ago · 24 msgs      │ 我想做一款终端应用...                  │
 │ ─────────────────────── │                                        │
-│   Refactor parser       │ assistant                              │
+│   Refactor parser       │ 🤖 assistant · 2h ago    (magenta)     │
 │   Yesterday · 18 msgs   │ 好的，先了解一下...                    │
 │ ─────────────────────── │                                        │
-│   Debug auth flow       │ ▸ Bash: ls -la (12 lines)              │
+│   Debug auth flow       │ 🔧 Bash: ls -la (12 lines) (yellow)    │
 │   3d ago · 56 msgs      │                                        │
 └─────────────────────────┴────────────────────────────────────────┘
  ↑/↓ select   Enter focus preview   / search   ⌃F search-in-preview   q quit
@@ -174,20 +174,37 @@ has focus) to walk back through history. `g` jumps to the very first
 message; `G` jumps back to the latest. Whenever the user switches to a
 different session, the preview resets to bottom again.
 
+Each message starts with a header line: `<emoji> <role> · <relative time>`.
+The emoji and the entire header line are colored by role so the user can
+scan a long conversation by color alone. The body content is rendered in the
+default terminal color so code blocks etc. retain their natural styling.
+
+| Role         | Emoji | Header color | Body styling                           |
+|--------------|:-----:|--------------|----------------------------------------|
+| `user`       |  👤   | cyan, bold   | default (markdown → ANSI)              |
+| `assistant`  |  🤖   | magenta, bold | default (markdown → ANSI)             |
+| `tool_use`   |  🔧   | yellow       | collapsed one-liner; expanded = dim    |
+| `tool_result`|  📥   | gray         | collapsed one-liner; expanded = dim    |
+| `system`     |  ℹ️    | gray, italic | dim, italic                            |
+
+A `--no-emoji` CLI flag (and `CLAUDE_HISTORY_NO_EMOJI=1` env var) disables
+emoji and falls back to plain role labels (`user · 2h ago`, etc.) for
+terminals that render emoji poorly. Colors stay on regardless.
+
 Rendering rules per role:
 
 - **user / assistant**: markdown rendered to ANSI (bold, italic, inline code,
   fenced code blocks, lists, headings). Uses `marked` to parse and a small
   hand-written renderer for ANSI output. No external heavyweight Markdown ANSI
   library.
-- **tool_use**: rendered collapsed as `▸ <toolName>: <one-line summary>`. The
+- **tool_use**: rendered collapsed as `🔧 <toolName>: <one-line summary>`. The
   preview maintains an integer "active block index" pointing at one tool block
   at a time (defaulting to the first visible one). `Tab` toggles its expanded
   state; `Shift-Tab` advances the active block index to the next tool block
   in the message stream. Expanded view shows full input/output.
 - **tool_result**: same collapsed convention; the result body is shown in dim
   color when expanded.
-- **system**: dim, italic, prefixed with `system`.
+- **system**: dim, italic.
 
 ### In-preview search
 
