@@ -27,4 +27,12 @@ describe("relativeTime", () => {
   test("older → ISO date", () => {
     expect(relativeTime(new Date("2026-04-12T10:00:00Z"), NOW)).toBe("2026-04-12");
   });
+
+  test("small forward clock skew → 'just now'", () => {
+    expect(relativeTime(new Date("2026-05-07T12:00:30Z"), NOW)).toBe("just now");
+  });
+
+  test("large future date → ISO date", () => {
+    expect(relativeTime(new Date("2030-01-01T00:00:00Z"), NOW)).toBe("2030-01-01");
+  });
 });
