@@ -1,4 +1,4 @@
-# claude-history — TUI session viewer
+# claude-history-cli — TUI session viewer
 
 **Date:** 2026-05-07
 **Status:** Approved design, pending implementation plan
@@ -241,8 +241,8 @@ Rendering rules per role:
 ## File layout
 
 ```
-claude-history/
-├── package.json
+claude-history-cli/
+├── package.json                      # "name": "claude-history-cli"
 ├── tsconfig.json
 ├── bun.lockb
 ├── README.md
