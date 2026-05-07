@@ -128,10 +128,10 @@ from the active provider.
 ┌─ Sessions (42) ─────────┬─ Preview ──────────────────────────────┐
 │ ▸ Building Ink TUI app  │ user · 2h ago                          │
 │   2h ago · 24 msgs      │ 我想做一款终端应用...                  │
-│                         │                                        │
+│ ─────────────────────── │                                        │
 │   Refactor parser       │ assistant                              │
 │   Yesterday · 18 msgs   │ 好的，先了解一下...                    │
-│                         │                                        │
+│ ─────────────────────── │                                        │
 │   Debug auth flow       │ ▸ Bash: ls -la (12 lines)              │
 │   3d ago · 56 msgs      │                                        │
 └─────────────────────────┴────────────────────────────────────────┘
@@ -156,6 +156,10 @@ from the active provider.
   (use `string-width`).
 - Relative time examples: `just now`, `2h ago`, `Yesterday`, `3d ago`,
   `2026-04-12`.
+- Items are separated by a horizontal divider — a row of `─` characters
+  spanning the inner width of the left column, rendered in dim color. The
+  divider is drawn between every pair of adjacent items but not above the
+  first or below the last.
 
 ### Preview pane
 
