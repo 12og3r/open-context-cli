@@ -202,15 +202,19 @@ single-line search input slides in at the top of the preview pane.
   rendered text (inverse video on the matched substring) and auto-scrolls
   to the first match at or after the current viewport top.
 - `Enter` commits the query and closes the input bar; the highlights stay
-  on screen.
-- `n` jumps to the next match below; `N` jumps to the previous match.
-  Both wrap around at the ends.
+  on screen and the user uses the normal scroll keys (`PgUp` / `PgDn`,
+  `Ctrl-u` / `Ctrl-d`, `k` / `j`, `g` / `G`) to walk through the
+  conversation and visually find the next match.
 - `Esc` clears the query, removes highlights, and returns the viewport to
   where the user was before opening search.
 - Match logic: case-insensitive substring on the rendered text of each
-  message (post-markdown). Tool blocks are searched in their expanded form,
-  so a hit inside a collapsed tool block auto-expands that block when
-  jumped to.
+  message (post-markdown). Tool blocks are searched in their expanded
+  form; a collapsed tool block whose body matches is auto-expanded so the
+  highlight is visible.
+
+Per-match navigation (`n` / `N`) is intentionally out of scope for the
+MVP — visual scrolling over highlighted matches is enough for the
+expected session sizes. We can add it later if it becomes painful.
 
 ## Keybindings
 
@@ -226,8 +230,8 @@ single-line search input slides in at the top of the preview pane.
 | `Tab`                | preview     | toggle expand on active tool block     |
 | `Shift-Tab`          | preview     | move active tool block to next         |
 | `Ctrl-F`             | preview     | open in-preview search                 |
-| `n` / `N`            | preview     | next / previous search match           |
-| `Esc`                | preview     | exit search (clear query + highlights) |
+| `Enter`              | preview-search | commit query, keep highlights       |
+| `Esc`                | preview-search | exit search (clear query + highlights) |
 | `/`                  | list focus  | open list-search input                 |
 | `Esc`                | list-search | close search, clear filter             |
 | `Enter`              | list-search | apply filter, return to list focus     |
