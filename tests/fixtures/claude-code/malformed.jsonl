@@ -1,0 +1,3 @@
+{"type":"summary","summary":"Has a bad line","leafUuid":"z"}
+GARBAGE LINE
+{"type":"user","timestamp":"2026-05-07T07:00:00Z","message":{"role":"user","content":"after garbage"}}

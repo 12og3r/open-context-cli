@@ -1,0 +1,2 @@
+{"type":"user","timestamp":"2026-05-07T09:00:00Z","message":{"role":"user","content":"first user message that becomes the summary fallback"}}
+{"type":"assistant","timestamp":"2026-05-07T09:00:01Z","message":{"role":"assistant","content":"ack"}}
