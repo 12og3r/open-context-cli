@@ -70,37 +70,50 @@ export function SessionPreview({
     if (!pinToBottom && actualScrollLine !== scrollLine) setScrollLine(actualScrollLine);
   }, [actualScrollLine, scrollLine, pinToBottom]);
 
-  // Step the viewport by `delta` lines. Cursor advances/retreats only when its
-  // current message is fully scrolled past the corresponding edge.
+  // Step the viewport by `delta` lines. Cursor only crosses to a neighbor when
+  // that neighbor's first line is visible in the post-scroll viewport. As a
+  // safety net, if the cursor's own message would scroll entirely off-screen,
+  // the cursor falls back to the nearest visible message.
   const step = (delta: number) => {
     const wasPinned = pinToBottom;
     const curCursor = wasPinned ? lastIdx : Math.min(cursor, lastIdx);
     const curScroll = wasPinned ? maxScroll : actualScrollLine;
-    const cs = buffer.startLine[curCursor] ?? 0;
-    const ce = buffer.endLine[curCursor] ?? totalLines;
 
+    const nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
     let nextCursor = curCursor;
-    let nextScroll = curScroll;
 
-    if (delta > 0) {
-      // Down: only advance cursor when its last line has reached the viewport bottom.
-      if (ce > curScroll + viewportHeight) {
-        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
-      } else if (curCursor < lastIdx) {
+    if (delta > 0 && curCursor < lastIdx) {
+      const nextStart = buffer.startLine[curCursor + 1] ?? totalLines;
+      if (nextStart >= nextScroll && nextStart < nextScroll + viewportHeight) {
         nextCursor = curCursor + 1;
-        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
-      } else {
-        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
       }
-    } else {
-      // Up: only retreat cursor when its first line is at or above the viewport top.
-      if (cs < curScroll) {
-        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
-      } else if (curCursor > 0) {
+    } else if (delta < 0 && curCursor > 0) {
+      const prevStart = buffer.startLine[curCursor - 1] ?? 0;
+      if (prevStart >= nextScroll && prevStart < nextScroll + viewportHeight) {
         nextCursor = curCursor - 1;
-        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
-      } else {
-        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
+      }
+    }
+
+    // Reel cursor back onto a visible message if it would otherwise be entirely
+    // outside the viewport.
+    const cs = buffer.startLine[nextCursor] ?? 0;
+    const ce = buffer.endLine[nextCursor] ?? totalLines;
+    if (ce <= nextScroll) {
+      // Cursor's message is entirely above the viewport — pick the topmost
+      // message that still has content showing.
+      for (let i = 0; i <= lastIdx; i++) {
+        if ((buffer.endLine[i] ?? 0) > nextScroll) {
+          nextCursor = i;
+          break;
+        }
+      }
+    } else if (cs >= nextScroll + viewportHeight) {
+      // Entirely below the viewport — pick the bottommost visible message.
+      for (let i = lastIdx; i >= 0; i--) {
+        if ((buffer.startLine[i] ?? 0) < nextScroll + viewportHeight) {
+          nextCursor = i;
+          break;
+        }
       }
     }
 
