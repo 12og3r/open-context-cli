@@ -1,0 +1,2 @@
+{"type":"user","timestamp":"2026-05-07T09:00:00Z","message":{"role":"user","content":[{"type":"text","text":"<command-name>/clear</command-name>"}]}}
+{"type":"assistant","timestamp":"2026-05-07T09:00:01Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"TaskCreate","input":{"subject":"Bootstrap project","description":"Initialize package.json"}}]}}

@@ -1,11 +1,11 @@
 {
-  "name": "claude-history-cli",
+  "name": "open-context-cli",
   "version": "0.0.1",
   "private": true,
   "description": "Browse local Claude Code session history in a TUI.",
   "type": "module",
   "bin": {
-    "claude-history": "./dist/cli.js"
+    "open-context": "./dist/cli.js"
   },
   "scripts": {
     "dev": "bun run src/cli.tsx",

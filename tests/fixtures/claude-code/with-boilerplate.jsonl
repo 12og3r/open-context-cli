@@ -1,0 +1,4 @@
+{"type":"user","isMeta":true,"timestamp":"2026-05-07T09:00:00Z","message":{"role":"user","content":[{"type":"text","text":"<local-command-caveat>Caveat: ignore me</local-command-caveat>"}]}}
+{"type":"user","timestamp":"2026-05-07T09:00:01Z","message":{"role":"user","content":[{"type":"text","text":"<command-name>/clear</command-name>\n            <command-message>clear</command-message>\n            <command-args></command-args>"}]}}
+{"type":"user","timestamp":"2026-05-07T09:00:02Z","message":{"role":"user","content":"the real prompt the user typed"}}
+{"type":"assistant","timestamp":"2026-05-07T09:00:03Z","message":{"role":"assistant","content":"ok"}}

@@ -12,7 +12,16 @@ async function makeRoot(): Promise<string> {
   // Mimic Claude Code layout: <root>/<encoded-project>/<uuid>.jsonl
   const sub = path.join(root, "-Users-roger-projects-foo");
   await fs.mkdir(sub, { recursive: true });
-  for (const f of ["with-summary.jsonl", "without-summary.jsonl", "with-tools.jsonl", "malformed.jsonl", "empty.jsonl"]) {
+  for (const f of [
+    "with-summary.jsonl",
+    "without-summary.jsonl",
+    "with-tools.jsonl",
+    "malformed.jsonl",
+    "empty.jsonl",
+    "with-boilerplate.jsonl",
+    "with-slug.jsonl",
+    "with-task.jsonl",
+  ]) {
     await fs.copyFile(path.join(FIXTURES, f), path.join(sub, f));
   }
   return root;
@@ -23,12 +32,33 @@ describe("ClaudeCodeProvider.listSessions", () => {
     const root = await makeRoot();
     const provider = new ClaudeCodeProvider();
     const list = await provider.listSessions(root);
-    expect(list).toHaveLength(5);
+    expect(list).toHaveLength(8);
     const byName = Object.fromEntries(list.map(m => [path.basename(m.filePath), m]));
     expect(byName["with-summary.jsonl"]!.summary).toBe("Building Ink TUI app");
     expect(byName["without-summary.jsonl"]!.summary).toContain("first user message");
     expect(byName["empty.jsonl"]!.summary).toBe("(empty session)");
     expect(byName["malformed.jsonl"]!.summary).toBe("Has a bad line");
+  });
+
+  test("skips slash-command boilerplate when extracting first user text", async () => {
+    const root = await makeRoot();
+    const list = await new ClaudeCodeProvider().listSessions(root);
+    const byName = Object.fromEntries(list.map(m => [path.basename(m.filePath), m]));
+    expect(byName["with-boilerplate.jsonl"]!.summary).toBe("the real prompt the user typed");
+  });
+
+  test("uses slug as fallback when no meaningful user text exists", async () => {
+    const root = await makeRoot();
+    const list = await new ClaudeCodeProvider().listSessions(root);
+    const byName = Object.fromEntries(list.map(m => [path.basename(m.filePath), m]));
+    expect(byName["with-slug.jsonl"]!.summary).toBe("drifting-weaving-platypus");
+  });
+
+  test("falls back to first TaskCreate subject when user text is boilerplate-only", async () => {
+    const root = await makeRoot();
+    const list = await new ClaudeCodeProvider().listSessions(root);
+    const byName = Object.fromEntries(list.map(m => [path.basename(m.filePath), m]));
+    expect(byName["with-task.jsonl"]!.summary).toBe("Bootstrap project");
   });
 
   test("decodes projectPath from parent directory", async () => {

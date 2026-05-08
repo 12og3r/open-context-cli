@@ -121,7 +121,10 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
   const id = path.basename(filePath, ".jsonl");
 
   let summary = "";
+  let customTitle = "";
+  let latestSlug = "";
   let firstUserText = "";
+  let firstTaskSubject = "";
   let messageCount = 0;
 
   const rl = readline.createInterface({
@@ -135,15 +138,26 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
     const type = entry.type;
     if (type === "summary" && !summary && typeof entry.summary === "string") {
       summary = entry.summary;
+    } else if (type === "custom-title" && typeof entry.customTitle === "string") {
+      customTitle = entry.customTitle;
     } else if ((type === "user" || type === "assistant")) {
       messageCount += 1;
-      if (!firstUserText && type === "user") {
+      if (!firstUserText && type === "user" && entry.isMeta !== true) {
         firstUserText = extractFirstUserText(entry);
       }
+      if (!firstTaskSubject && type === "assistant") {
+        firstTaskSubject = extractFirstTaskSubject(entry);
+      }
     }
+    if (typeof entry.slug === "string" && entry.slug) latestSlug = entry.slug;
   }
 
-  if (!summary) summary = firstUserText || "(empty session)";
+  summary = summary
+    || customTitle
+    || firstUserText
+    || firstTaskSubject
+    || latestSlug
+    || "(empty session)";
 
   return {
     id,
@@ -155,14 +169,56 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
   };
 }
 
+// Strip slash-command boilerplate that the Claude Code CLI injects into the
+// first user message: <local-command-caveat>, <command-name>, <command-args>,
+// <system-reminder>, <bash-input>, etc. Returns the first non-empty line of
+// what's left.
 function extractFirstUserText(entry: Record<string, unknown>): string {
   const msg = (entry.message as { content?: unknown } | undefined)?.content;
-  if (typeof msg === "string") return msg.split("\n")[0] ?? "";
-  if (Array.isArray(msg)) {
+  let text = "";
+  if (typeof msg === "string") {
+    text = msg;
+  } else if (Array.isArray(msg)) {
     for (const part of msg) {
       if (part && typeof part === "object" && (part as { type?: string }).type === "text") {
-        const text = (part as { text?: string }).text;
-        if (typeof text === "string") return text.split("\n")[0] ?? "";
+        const t = (part as { text?: string }).text;
+        if (typeof t === "string") { text = t; break; }
+      }
+    }
+  }
+  return cleanBoilerplate(text);
+}
+
+const BOILERPLATE_TAG = /<(?:local-command-caveat|command-name|command-message|command-args|local-command-stdout|local-command-stderr|command-stdout|command-stderr|system-reminder|bash-input|bash-stdout|bash-stderr)\b[^>]*>[\s\S]*?<\/(?:local-command-caveat|command-name|command-message|command-args|local-command-stdout|local-command-stderr|command-stdout|command-stderr|system-reminder|bash-input|bash-stdout|bash-stderr)>/g;
+
+function cleanBoilerplate(text: string): string {
+  const stripped = text.replace(BOILERPLATE_TAG, "");
+  for (const line of stripped.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+}
+
+function extractFirstTaskSubject(entry: Record<string, unknown>): string {
+  const content = (entry.message as { content?: unknown } | undefined)?.content;
+  if (!Array.isArray(content)) return "";
+  for (const part of content) {
+    if (!part || typeof part !== "object") continue;
+    const p = part as { type?: string; name?: string; input?: Record<string, unknown> };
+    if (p.type !== "tool_use" || !p.input) continue;
+    if (p.name === "TaskCreate") {
+      const subject = typeof p.input.subject === "string" ? p.input.subject : "";
+      const description = typeof p.input.description === "string" ? p.input.description : "";
+      const text = subject || description;
+      if (text) return text.split("\n")[0]!.trim();
+    } else if (p.name === "TodoWrite") {
+      const todos = p.input.todos;
+      if (Array.isArray(todos) && todos.length > 0) {
+        const first = todos[0] as { content?: unknown };
+        if (typeof first.content === "string" && first.content) {
+          return first.content.split("\n")[0]!.trim();
+        }
       }
     }
   }

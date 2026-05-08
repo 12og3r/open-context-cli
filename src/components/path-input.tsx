@@ -15,7 +15,7 @@ export function PathInput({
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1} width={72}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">claude-history</Text>
+        <Text bold color="cyan">open-context</Text>
         <Text dimColor>  ·  session browser</Text>
       </Box>
       {reason === "no-default-path" && (

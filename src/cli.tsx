@@ -16,11 +16,11 @@ function parseArgs(argv: string[]): { path?: string; emoji: boolean } {
 }
 
 function printHelp() {
-  process.stdout.write(`claude-history — browse local Claude Code session history
+  process.stdout.write(`open-context — browse local Claude Code session history
 
 Usage:
-  claude-history [--path <dir-or-file>] [--no-emoji]
-  claude-history --help
+  open-context [--path <dir-or-file>] [--no-emoji]
+  open-context --help
 
 Options:
   --path <p>    Use <p> as the session root instead of ~/.claude/projects.
