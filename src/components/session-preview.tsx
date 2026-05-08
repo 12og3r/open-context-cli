@@ -39,6 +39,18 @@ export function SessionPreview({
   const [committedQuery, setCommittedQuery] = useState("");
   const [matchIndex, setMatchIndex] = useState<number>(-1);
 
+  // Track the query|messages.length pair for which we last placed the initial
+  // matchIndex. Using a ref avoids adding matchIndex to the dep array (which
+  // would loop: effect sets matchIndex → re-render → matches identity changes
+  // → effect re-runs). Loop is bounded by the initKey guard.
+  const lastInitKey = useRef<string | null>(null);
+
+  // Tracks the last visited match position (msgIndex + contentOffset).
+  // On first open the anchor is null (falls back to cursor). After each
+  // navigate or re-anchor the ref is updated so that narrowing the query
+  // stays near the user's current offset within a long message.
+  const lastAnchorRef = useRef<{ msgIndex: number; contentOffset: number } | null>(null);
+
   // Reset only on real session switch.
   useEffect(() => {
     setPinToBottom(true);
@@ -50,6 +62,7 @@ export function SessionPreview({
     setCommittedQuery("");
     setMatchIndex(-1);
     lastInitKey.current = null;
+    lastAnchorRef.current = null;
   }, [sessionId]);
 
   const lastIdx = Math.max(0, messages.length - 1);
@@ -114,14 +127,12 @@ export function SessionPreview({
     }
   };
 
-  // Track the query|messages.length pair for which we last placed the initial
-  // matchIndex. Using a ref avoids adding matchIndex to the dep array (which
-  // would loop: effect sets matchIndex → re-render → matches identity changes
-  // → effect re-runs).
-  const lastInitKey = useRef<string | null>(null);
-
   useEffect(() => {
-    if (!searchOpen) { lastInitKey.current = null; return; }
+    if (!searchOpen) {
+      lastInitKey.current = null;
+      lastAnchorRef.current = null;
+      return;
+    }
     if (matches.length === 0) {
       if (matchIndex !== -1) setMatchIndex(-1);
       return;
@@ -131,15 +142,31 @@ export function SessionPreview({
     if (lastInitKey.current === initKey) return;
     lastInitKey.current = initKey;
 
-    // cursor, pinToBottom, lastIdx are intentionally not deps — we want their
-    // values at the moment the search opens (or the query/messages change),
-    // not on every cursor move.
-    const startCursor = pinToBottom ? lastIdx : Math.min(cursor, lastIdx);
-    const firstAfter = matches.findIndex(m => m.msgIndex >= startCursor);
+    // Determine anchor: on first open use cursor position; on subsequent
+    // typing use the last visited match (preserves offset within a message).
+    let anchorMsgIndex: number;
+    let anchorOffset: number;
+    if (lastAnchorRef.current === null) {
+      // First open — anchor to the cursor's message, offset 0.
+      const startCursor = pinToBottom ? lastIdx : Math.min(cursor, lastIdx);
+      anchorMsgIndex = startCursor;
+      anchorOffset = 0;
+    } else {
+      anchorMsgIndex = lastAnchorRef.current.msgIndex;
+      anchorOffset = lastAnchorRef.current.contentOffset;
+    }
+
+    // First match at-or-after the anchor (both msgIndex and contentOffset).
+    const firstAfter = matches.findIndex(
+      m => m.msgIndex > anchorMsgIndex ||
+           (m.msgIndex === anchorMsgIndex && m.contentOffset >= anchorOffset)
+    );
     const idx = firstAfter >= 0 ? firstAfter : 0;
     setMatchIndex(idx);
 
     const target = matches[idx]!;
+    // Update anchor to the chosen match so the next query change stays here.
+    lastAnchorRef.current = { msgIndex: target.msgIndex, contentOffset: target.contentOffset };
     setCursor(target.msgIndex);
     setPinToBottom(false);
     scrollMatchIntoView(target);
@@ -207,6 +234,8 @@ export function SessionPreview({
     if (idx < 0 || idx >= matches.length) return;
     const m = matches[idx]!;
     setMatchIndex(idx);
+    // Update the anchor so that subsequent query narrowing stays near this offset.
+    lastAnchorRef.current = { msgIndex: m.msgIndex, contentOffset: m.contentOffset };
     setCursor(m.msgIndex);
     setPinToBottom(false);
     scrollMatchIntoView(m);
@@ -225,6 +254,7 @@ export function SessionPreview({
   const commitSearch = () => {
     setSearchOpen(false);
     setCommittedQuery(searchValue);
+    lastAnchorRef.current = null;
     if (matches.length > 0 && matchIndex >= 0) {
       const target = matches[matchIndex]!;
       setCursor(target.msgIndex);

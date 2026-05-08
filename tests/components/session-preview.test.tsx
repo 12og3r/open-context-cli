@@ -205,4 +205,28 @@ describe("SessionPreview", () => {
     expect(out).toContain("🔎");
     expect(out).not.toMatch(/\d+ \/ \d+/);
   });
+
+  test("typing more chars within a single message keeps the user at the same offset", async () => {
+    const messages = [
+      { role: "user", content: "axx-axx-ayy", timestamp: new Date(0), raw: {} },
+    ] as Message[];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="x" focused={true}
+                      height={20} width={60} emoji={false} />
+    );
+    await tick();
+    stdin.write("\x06");
+    await tick();
+    stdin.write("a");        // 3 matches at offsets 0, 4, 8
+    await tick();
+    expect(lastFrame() ?? "").toContain("1 / 3");
+    stdin.write("\x1b[B");    // ↓ → match index 1 (offset 4)
+    await tick();
+    expect(lastFrame() ?? "").toContain("2 / 3");
+    // Narrow: "ax" matches at offsets 0 and 4 (not 8, which is "ayy").
+    // User was at offset 4, expects to stay there → counter "2 / 2".
+    stdin.write("x");
+    await tick();
+    expect(lastFrame() ?? "").toContain("2 / 2");
+  });
 });
