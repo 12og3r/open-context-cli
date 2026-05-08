@@ -91,7 +91,7 @@ export function SessionBrowser({
               onPrev={() => {}}
               onNext={() => {}}
               matchIndex={-1}
-              matchCount={0}
+              matchCount={-1}
             />
           ) : null}
           <SessionList

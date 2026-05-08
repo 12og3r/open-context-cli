@@ -22,13 +22,16 @@ export function SearchBar({
   matchIndex: number;
   matchCount: number;
 }) {
+  const showCounter = matchCount >= 0;
   const hasQuery = value.length > 0;
-  const zero = hasQuery && matchCount === 0;
-  const counterText = !hasQuery
+  const zero = showCounter && hasQuery && matchCount === 0;
+  const counterText = !showCounter
     ? ""
-    : matchCount === 0
-      ? "0 / 0"
-      : `${matchIndex + 1} / ${matchCount}`;
+    : !hasQuery
+      ? ""
+      : matchCount === 0
+        ? "0 / 0"
+        : `${matchIndex + 1} / ${matchCount}`;
 
   return (
     <Box>

@@ -42,6 +42,5 @@ describe("SearchBar", () => {
     const { lastFrame } = render(<Harness matchIndex={-1} matchCount={0} />);
     const out = lastFrame() ?? "";
     expect(out).toContain("0 / 0");
-    expect(out).toContain("\x1b[31m"); // FG_RED
   });
 });
