@@ -10,7 +10,7 @@ import {
 } from "../lib/render-message.ts";
 import { SearchBar } from "./search-bar.tsx";
 
-const EMPTY_BUFFER: ConversationBuffer = { lines: [], startLine: [], endLine: [] };
+const EMPTY_BUFFER: ConversationBuffer = { lines: [], startLine: [], endLine: [], matches: [] };
 
 export function SessionPreview({
   messages,
@@ -68,7 +68,7 @@ export function SessionPreview({
       try {
         const result = await renderConversationAsync(
           messages,
-          { width, expanded, emoji, now: new Date(), query },
+          { width, expanded, emoji, now: new Date(), query, matchIndex: -1 },
           () => cancelled,
         );
         if (cancelled) return;

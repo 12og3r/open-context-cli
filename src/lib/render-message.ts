@@ -160,6 +160,7 @@ export type ConversationBuffer = {
   lines: string[];
   startLine: number[];
   endLine: number[];
+  matches: Match[];
 };
 
 export type RenderConversationOpts = {
@@ -168,6 +169,7 @@ export type RenderConversationOpts = {
   emoji: boolean;
   now: Date;
   query: string;
+  matchIndex: number;
 };
 
 const YIELD_EVERY = 64;
@@ -179,7 +181,9 @@ const YIELD_EVERY = 64;
  */
 export function renderConversation(messages: Message[], opts: RenderConversationOpts): ConversationBuffer {
   const useCache = !opts.query;
-  const hl = useCache ? messages : applyHighlight(messages, opts.query, -1).messages;
+  const { messages: hl, matches } = useCache
+    ? { messages, matches: [] as Match[] }
+    : applyHighlight(messages, opts.query, opts.matchIndex);
   const lines: string[] = [];
   const startLine: number[] = new Array(hl.length);
   const endLine: number[] = new Array(hl.length);
@@ -189,7 +193,7 @@ export function renderConversation(messages: Message[], opts: RenderConversation
     for (const ml of msgLines) lines.push(ml);
     endLine[i] = lines.length;
   }
-  return { lines, startLine, endLine };
+  return { lines, startLine, endLine, matches };
 }
 
 /**
@@ -213,7 +217,9 @@ export async function renderConversationAsync(
   isCancelled?: () => boolean,
 ): Promise<ConversationBuffer> {
   const useCache = !opts.query;
-  const hl = useCache ? messages : applyHighlight(messages, opts.query, -1).messages;
+  const { messages: hl, matches } = useCache
+    ? { messages, matches: [] as Match[] }
+    : applyHighlight(messages, opts.query, opts.matchIndex);
   const lines: string[] = [];
   const startLine: number[] = new Array(hl.length);
   const endLine: number[] = new Array(hl.length);
@@ -227,7 +233,7 @@ export async function renderConversationAsync(
       await new Promise(resolve => setImmediate(resolve));
     }
   }
-  return { lines, startLine, endLine };
+  return { lines, startLine, endLine, matches };
 }
 
 function renderOne(
