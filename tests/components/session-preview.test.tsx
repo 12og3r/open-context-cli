@@ -100,6 +100,7 @@ describe("SessionPreview", () => {
       { role: "assistant", content: "tail", timestamp: new Date(0), raw: {} },
     ] as Message[];
 
+    // height=8 keeps totalLines > viewportHeight so the "X / total" footer renders.
     const { stdin, lastFrame } = render(
       <SessionPreview messages={messages} sessionId="x" focused={true}
                       height={8} width={40} emoji={false} />
@@ -125,6 +126,7 @@ describe("SessionPreview", () => {
       { role: "assistant", content: "needle", timestamp: new Date(0), raw: {} },
       { role: "assistant", content: "tail", timestamp: new Date(0), raw: {} },
     ] as Message[];
+    // height=8 keeps totalLines > viewportHeight so the "X / total" footer renders.
     const { stdin, lastFrame } = render(
       <SessionPreview messages={messages} sessionId="x" focused={true}
                       height={8} width={40} emoji={false} />
