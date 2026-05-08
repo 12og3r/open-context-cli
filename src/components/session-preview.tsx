@@ -235,6 +235,21 @@ export function SessionPreview({
   useInput((input, key) => {
     if (!focused) return;
     if (searchOpen) return;
+
+    const inAfterglow = !searchOpen && committedQuery !== "";
+    const isOrdinaryNav =
+      key.upArrow || key.downArrow || key.leftArrow || key.rightArrow ||
+      input === "j" || input === "k" || input === "g" || input === "G" ||
+      key.pageUp || key.pageDown ||
+      (key.ctrl && (input === "d" || input === "u")) ||
+      (key.tab && !key.shift);
+
+    if (inAfterglow && isOrdinaryNav) {
+      setCommittedQuery("");
+      setMatchIndex(-1);
+      // Fall through — the key still performs its normal action below.
+    }
+
     if (key.ctrl && (input === "f" || input === "F")) {
       setSearchOpen(true);
       return;

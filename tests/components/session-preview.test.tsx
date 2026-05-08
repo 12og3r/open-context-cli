@@ -141,4 +141,30 @@ describe("SessionPreview", () => {
     expect(lastFrame() ?? "").toContain("\x1b[43m");
     expect(lastFrame() ?? "").toContain("2 / 3");
   });
+
+  test("after Enter, pressing j clears highlights and moves cursor", async () => {
+    const messages = [
+      { role: "assistant", content: "alpha", timestamp: new Date(0), raw: {} },
+      { role: "assistant", content: "needle", timestamp: new Date(0), raw: {} },
+      { role: "assistant", content: "omega", timestamp: new Date(0), raw: {} },
+    ] as Message[];
+    // height=8 keeps totalLines > viewportHeight so the "X / total" footer renders.
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="x" focused={true}
+                      height={8} width={40} emoji={false} />
+    );
+    await tick();
+    stdin.write("\x06");
+    await tick();
+    stdin.write("needle");
+    await tick();
+    stdin.write("\r");
+    await tick();
+    expect(lastFrame() ?? "").toContain("\x1b[43m"); // yellow current match
+    // Now press j (down) — afterglow clears.
+    stdin.write("j");
+    await tick();
+    expect(lastFrame() ?? "").not.toContain("\x1b[43m");
+    expect(lastFrame() ?? "").not.toContain("\x1b[7m"); // no INVERSE either
+  });
 });
