@@ -19,11 +19,10 @@ export function SessionPreview({
   width: number;
   emoji?: boolean;
 }) {
-  const [cursor, setCursor] = useState(0);
-  // While pinToBottom is true, the cursor follows the most recent message
-  // automatically. The user "unpins" by moving the cursor, but session-switch
-  // re-pins so a new session opens at the latest.
+  // pinToBottom: while true, the viewport sticks to the latest message and the
+  //   cursor sits on lastIdx automatically. Any j/k/g/PgUp/PgDn unpins.
   const [pinToBottom, setPinToBottom] = useState(true);
+  const [cursor, setCursor] = useState(0);
   const [scrollLine, setScrollLine] = useState(0);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [searchOpen, setSearchOpen] = useState(false);
@@ -42,12 +41,10 @@ export function SessionPreview({
   }, [sessionId]);
 
   const lastIdx = Math.max(0, messages.length - 1);
-  const effectiveCursor = pinToBottom ? lastIdx : Math.min(cursor, lastIdx);
-
-  // Reserve 1 row for the overflow hint.
   const viewportHeight = Math.max(1, height - 1 - (searchOpen ? 1 : 0));
-
   const query = committedQuery || (searchOpen ? searchValue : "");
+
+  const effectiveCursor = pinToBottom ? lastIdx : Math.min(cursor, lastIdx);
 
   const buffer = useMemo(
     () =>
@@ -63,39 +60,52 @@ export function SessionPreview({
     [messages, width, effectiveCursor, focused, expanded, emoji, query],
   );
 
-  const cursorStart = buffer.startLine[effectiveCursor] ?? 0;
-  const cursorEnd = buffer.endLine[effectiveCursor] ?? buffer.lines.length;
+  const totalLines = buffer.lines.length;
+  const maxScroll = Math.max(0, totalLines - viewportHeight);
+  const actualScrollLine = pinToBottom ? maxScroll : clampToRange(scrollLine, 0, maxScroll);
 
-  // While pinned, always anchor the viewport to the bottom of the buffer so
-  // the latest message sits at the bottom even as messages stream in.
-  // Otherwise, only shift when the cursor's lines would leave the viewport.
-  const actualScrollLine = pinToBottom
-    ? Math.max(0, buffer.lines.length - viewportHeight)
-    : clampScroll(scrollLine, cursorStart, cursorEnd, viewportHeight, buffer.lines.length);
-
-  // Persist the clamped value so subsequent user actions start from the right place.
+  // Persist the clamped scroll value when it differs from state.
   useEffect(() => {
-    if (actualScrollLine !== scrollLine) setScrollLine(actualScrollLine);
-  }, [actualScrollLine, scrollLine]);
+    if (!pinToBottom && actualScrollLine !== scrollLine) setScrollLine(actualScrollLine);
+  }, [actualScrollLine, scrollLine, pinToBottom]);
 
-  const moveCursorTo = (next: number) => {
-    const clamped = Math.max(0, Math.min(lastIdx, next));
-    if (clamped === effectiveCursor && !pinToBottom) return;
-    if (clamped === effectiveCursor && pinToBottom && clamped === lastIdx) {
-      // No-op: pinned at last and trying to go past it.
-      return;
+  // Step the viewport by `delta` lines. Cursor advances/retreats only when its
+  // current message is fully scrolled past the corresponding edge.
+  const step = (delta: number) => {
+    const wasPinned = pinToBottom;
+    const curCursor = wasPinned ? lastIdx : Math.min(cursor, lastIdx);
+    const curScroll = wasPinned ? maxScroll : actualScrollLine;
+    const cs = buffer.startLine[curCursor] ?? 0;
+    const ce = buffer.endLine[curCursor] ?? totalLines;
+
+    let nextCursor = curCursor;
+    let nextScroll = curScroll;
+
+    if (delta > 0) {
+      // Down: only advance cursor when its last line has reached the viewport bottom.
+      if (ce > curScroll + viewportHeight) {
+        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
+      } else if (curCursor < lastIdx) {
+        nextCursor = curCursor + 1;
+        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
+      } else {
+        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
+      }
+    } else {
+      // Up: only retreat cursor when its first line is at or above the viewport top.
+      if (cs < curScroll) {
+        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
+      } else if (curCursor > 0) {
+        nextCursor = curCursor - 1;
+        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
+      } else {
+        nextScroll = clampToRange(curScroll + delta, 0, maxScroll);
+      }
     }
-    setCursor(clamped);
-    setPinToBottom(clamped === lastIdx);
-  };
 
-  const doScroll = (delta: number) => {
-    const max = Math.max(0, buffer.lines.length - viewportHeight);
-    const next = Math.max(0, Math.min(max, actualScrollLine + delta));
-    setScrollLine(next);
-    const newCursor = moveCursorToVisible(effectiveCursor, next, viewportHeight, buffer, lastIdx, delta);
-    setCursor(newCursor);
-    setPinToBottom(newCursor === lastIdx && next >= max);
+    setPinToBottom(nextCursor === lastIdx && nextScroll === maxScroll);
+    setCursor(nextCursor);
+    setScrollLine(nextScroll);
   };
 
   useInput((input, key) => {
@@ -105,22 +115,27 @@ export function SessionPreview({
       setSearchOpen(true);
       return;
     }
-    if (input === "j" || key.downArrow) moveCursorTo(effectiveCursor + 1);
-    else if (input === "k" || key.upArrow) moveCursorTo(effectiveCursor - 1);
-    else if (key.ctrl && input === "d") doScroll(Math.floor(viewportHeight / 2));
-    else if (key.ctrl && input === "u") doScroll(-Math.floor(viewportHeight / 2));
-    else if (key.pageDown) doScroll(viewportHeight);
-    else if (key.pageUp) doScroll(-viewportHeight);
+    if (input === "j" || key.downArrow) step(1);
+    else if (input === "k" || key.upArrow) step(-1);
+    else if (key.ctrl && input === "d") step(Math.floor(viewportHeight / 2));
+    else if (key.ctrl && input === "u") step(-Math.floor(viewportHeight / 2));
+    else if (key.pageDown) step(viewportHeight);
+    else if (key.pageUp) step(-viewportHeight);
     else if (input === "G") {
       setPinToBottom(true);
       setCursor(lastIdx);
     }
-    else if (input === "g") moveCursorTo(0);
+    else if (input === "g") {
+      setPinToBottom(false);
+      setCursor(0);
+      setScrollLine(0);
+    }
     else if (key.tab && !key.shift) {
+      const target = pinToBottom ? lastIdx : effectiveCursor;
       setExpanded(prev => {
         const next = new Set(prev);
-        if (next.has(effectiveCursor)) next.delete(effectiveCursor);
-        else next.add(effectiveCursor);
+        if (next.has(target)) next.delete(target);
+        else next.add(target);
         return next;
       });
     }
@@ -135,9 +150,9 @@ export function SessionPreview({
   }
 
   const visibleLines = buffer.lines.slice(actualScrollLine, actualScrollLine + viewportHeight);
-  const showOverflowHint = buffer.lines.length > viewportHeight;
+  const showOverflowHint = totalLines > viewportHeight;
   const hasAbove = actualScrollLine > 0;
-  const hasBelow = actualScrollLine + viewportHeight < buffer.lines.length;
+  const hasBelow = actualScrollLine + viewportHeight < totalLines;
 
   return (
     <Box flexDirection="column" width={width} height={height}>
@@ -167,46 +182,8 @@ export function SessionPreview({
   );
 }
 
-function clampScroll(
-  prev: number,
-  cursorStart: number,
-  cursorEnd: number,
-  viewportHeight: number,
-  totalLines: number,
-): number {
-  let s = prev;
-  if (cursorStart < s) s = cursorStart;
-  if (cursorEnd > s + viewportHeight) s = cursorEnd - viewportHeight;
-  if (s < 0) s = 0;
-  const max = Math.max(0, totalLines - viewportHeight);
-  if (s > max) s = max;
-  return s;
-}
-
-function moveCursorToVisible(
-  cursor: number,
-  scrollLine: number,
-  viewportHeight: number,
-  buffer: { startLine: number[]; endLine: number[] },
-  lastIdx: number,
-  direction: number,
-): number {
-  const top = scrollLine;
-  const bottom = scrollLine + viewportHeight;
-  if (cursor < 0) return 0;
-  if (cursor > lastIdx) return lastIdx;
-  const start = buffer.startLine[cursor] ?? 0;
-  const end = buffer.endLine[cursor] ?? 0;
-  if (start >= top && end <= bottom) return cursor;
-  if (direction < 0) {
-    for (let i = 0; i <= lastIdx; i++) {
-      if ((buffer.startLine[i] ?? 0) >= top) return i;
-    }
-    return cursor;
-  } else {
-    for (let i = lastIdx; i >= 0; i--) {
-      if ((buffer.endLine[i] ?? 0) <= bottom) return i;
-    }
-    return cursor;
-  }
+function clampToRange(n: number, lo: number, hi: number): number {
+  if (n < lo) return lo;
+  if (n > hi) return hi;
+  return n;
 }

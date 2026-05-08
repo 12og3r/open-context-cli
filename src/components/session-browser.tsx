@@ -115,9 +115,9 @@ export function SessionBrowser({
           {detail.status === "error" && (
             <Text color="red">! {detail.error.message}</Text>
           )}
-          {(detail.status === "ready" || detail.status === "loading") && (
+          {detail.status === "ready" && (
             <SessionPreview
-              messages={"messages" in detail ? detail.messages : detail.partial}
+              messages={detail.messages}
               sessionId={selected?.id ?? null}
               focused={previewFocused}
               height={innerHeight}

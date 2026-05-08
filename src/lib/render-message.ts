@@ -98,16 +98,25 @@ export function renderMessageLines(message: Message, opts: RenderMessageOpts): s
     bodyText = markdownToAnsi(message.content || "");
   }
 
+  // Body line prefix: matches the header's bar column. For the current
+  // (cursor) message we render a thin cyan stripe so you can see which
+  // message you're on even when its header has scrolled off-screen.
+  const bodyPrefix = current
+    ? `  ${FG_CYAN}▏${RESET} `
+    : indent;
+
   if (bodyText.length > 0) {
     const wrapped = wrapAnsi(bodyText, bodyWidth, { hard: true, trim: false });
     for (const ln of wrapped.split("\n")) {
       // Always wrap the body line in its own style envelope so a wrapped row
       // doesn't inherit stale styles from the previous one.
-      out.push(`${indent}${bodyStyle}${ln}${RESET}`);
+      out.push(`${bodyPrefix}${bodyStyle}${ln}${RESET}`);
     }
   }
 
-  out.push("");
+  // Trailing margin row also carries the stripe so the visible "current
+  // message" band is uninterrupted at the bottom of the message.
+  out.push(current ? `  ${FG_CYAN}▏${RESET}` : "");
   return out;
 }
 
