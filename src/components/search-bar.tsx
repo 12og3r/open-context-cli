@@ -20,6 +20,8 @@ export function SearchBar({
   onPrev: () => void;
   onNext: () => void;
   matchIndex: number;
+  // matchCount < 0 suppresses the counter — used by the session-list filter
+  // where the bar is a filter, not a navigable search.
   matchCount: number;
 }) {
   const showCounter = matchCount >= 0;
