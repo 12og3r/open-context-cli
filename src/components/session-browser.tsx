@@ -88,6 +88,7 @@ export function SessionBrowser({
             sessions={filtered}
             selectedId={selected?.id ?? null}
             width={leftWidth}
+            height={contentHeight - 1}
           />
         </Box>
         <Box flexDirection="column" width={rightWidth}>
