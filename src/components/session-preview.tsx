@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import type { Message } from "../providers/types.ts";
-import { renderConversation } from "../lib/render-message.ts";
+import { applyCursorOverlay, renderConversation } from "../lib/render-message.ts";
 import { SearchBar } from "./search-bar.tsx";
 
 export function SessionPreview({
@@ -46,18 +46,19 @@ export function SessionPreview({
 
   const effectiveCursor = pinToBottom ? lastIdx : Math.min(cursor, lastIdx);
 
+  // Cursor doesn't enter the deps — cursor styling is applied as a cheap
+  // overlay at render time, so j/k don't trigger a full re-render of every
+  // message's markdown.
   const buffer = useMemo(
     () =>
       renderConversation(messages, {
         width,
-        cursor: effectiveCursor,
-        focused,
         expanded,
         emoji,
         now: new Date(),
         query,
       }),
-    [messages, width, effectiveCursor, focused, expanded, emoji, query],
+    [messages, width, expanded, emoji, query],
   );
 
   const totalLines = buffer.lines.length;
@@ -149,10 +150,28 @@ export function SessionPreview({
     );
   }
 
-  const visibleLines = buffer.lines.slice(actualScrollLine, actualScrollLine + viewportHeight);
   const showOverflowHint = totalLines > viewportHeight;
   const hasAbove = actualScrollLine > 0;
   const hasBelow = actualScrollLine + viewportHeight < totalLines;
+
+  const cursorStart = buffer.startLine[effectiveCursor] ?? -1;
+  const cursorEnd = buffer.endLine[effectiveCursor] ?? -1;
+  const cursorLastLine = cursorEnd - 1;
+
+  const visibleLines: string[] = [];
+  for (let i = actualScrollLine; i < actualScrollLine + viewportHeight; i++) {
+    if (i >= totalLines) {
+      visibleLines.push("");
+      continue;
+    }
+    const raw = buffer.lines[i] ?? "";
+    if (focused && i >= cursorStart && i < cursorEnd) {
+      const kind = i === cursorStart ? "header" : i === cursorLastLine ? "margin" : "body";
+      visibleLines.push(applyCursorOverlay(raw, kind));
+    } else {
+      visibleLines.push(raw);
+    }
+  }
 
   return (
     <Box flexDirection="column" width={width} height={height}>

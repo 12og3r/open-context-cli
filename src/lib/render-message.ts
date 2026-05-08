@@ -122,14 +122,14 @@ export function renderMessageLines(message: Message, opts: RenderMessageOpts): s
 
 /**
  * Render the full conversation into a flat line buffer plus per-message line
- * ranges, so callers can window the buffer or jump to a specific message.
+ * ranges. The buffer does NOT include cursor highlighting — that gets applied
+ * cheaply at view time via `applyCursorOverlay`, so we don't have to rebuild
+ * the whole conversation when the cursor moves.
  */
 export function renderConversation(
   messages: Message[],
   opts: {
     width: number;
-    cursor: number;
-    focused: boolean;
     expanded: Set<number>;
     emoji: boolean;
     now: Date;
@@ -148,7 +148,7 @@ export function renderConversation(
     startLine[i] = lines.length;
     const msgLines = renderMessageLines(hl[i]!, {
       width: opts.width,
-      current: opts.focused && i === opts.cursor,
+      current: false,
       expanded: opts.expanded.has(i),
       emoji: opts.emoji,
       now: opts.now,
@@ -157,6 +157,23 @@ export function renderConversation(
     endLine[i] = lines.length;
   }
   return { lines, startLine, endLine };
+}
+
+/**
+ * Overlay the cursor styling on a single rendered line. Cheap — just rewrites
+ * the leading prefix. Called per visible line of the cursor's message.
+ */
+export function applyCursorOverlay(line: string, kind: "header" | "body" | "margin"): string {
+  if (kind === "margin") {
+    return `  ${FG_CYAN}▏${RESET}`;
+  }
+  if (kind === "header") {
+    // Header lines from renderMessageLines start with "  " (two spaces) when
+    // current=false. Replace those two columns with the cursor mark.
+    return `${FG_CYAN}${BOLD}› ${RESET}` + line.slice(2);
+  }
+  // body: starts with 4 spaces of indent. Replace with "  ▏ ".
+  return `  ${FG_CYAN}▏${RESET} ` + line.slice(4);
 }
 
 const INVERSE = "\x1b[7m";
