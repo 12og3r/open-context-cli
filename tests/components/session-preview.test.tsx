@@ -229,4 +229,64 @@ describe("SessionPreview", () => {
     await tick();
     expect(lastFrame() ?? "").toContain("2 / 2");
   });
+
+  test("full search flow: open / type / navigate / commit / clear", async () => {
+    const messages = [
+      { role: "user", content: "alpha", timestamp: new Date(0), raw: {} },
+      { role: "assistant", content: "needle one", timestamp: new Date(0), raw: {} },
+      { role: "user", content: "filler", timestamp: new Date(0), raw: {} },
+      { role: "assistant", content: "needle two", timestamp: new Date(0), raw: {} },
+      { role: "user", content: "tail", timestamp: new Date(0), raw: {} },
+    ] as Message[];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="smoke" focused={true}
+                      height={30} width={60} emoji={false} />
+    );
+    await tick();
+
+    // Open via /
+    stdin.write("/");
+    await tick();
+    expect(lastFrame() ?? "").toContain("🔎");
+
+    // Type query
+    stdin.write("needle");
+    await tick();
+    expect(lastFrame() ?? "").toMatch(/[12] \/ 2/);
+
+    // Navigate
+    stdin.write("\x1b[B"); // ↓
+    await tick();
+    stdin.write("\x1b[A"); // ↑
+    await tick();
+
+    // Commit
+    stdin.write("\r");
+    await tick();
+    expect(lastFrame() ?? "").not.toContain("🔎");
+    expect(lastFrame() ?? "").toContain("\x1b[43m"); // current still yellow
+
+    // Move on with j → afterglow clears
+    stdin.write("j");
+    await tick();
+    expect(lastFrame() ?? "").not.toContain("\x1b[43m");
+    expect(lastFrame() ?? "").not.toContain("\x1b[7m");
+  });
+
+  test("zero matches show 0 / 0 in red", async () => {
+    const messages = [
+      { role: "user", content: "nothing here", timestamp: new Date(0), raw: {} },
+    ] as Message[];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="zero" focused={true}
+                      height={10} width={40} emoji={false} />
+    );
+    await tick();
+    stdin.write("/");
+    await tick();
+    stdin.write("zzz");
+    await tick();
+    const out = lastFrame() ?? "";
+    expect(out).toContain("0 / 0");
+  });
 });
