@@ -25,11 +25,13 @@ export function MessageBlock({
   message,
   expanded,
   emoji = true,
+  current = false,
   now = new Date(),
 }: {
   message: Message;
   expanded: boolean;
   emoji?: boolean;
+  current?: boolean;
   now?: Date;
 }) {
   const headerLabel = headerFor(message);
@@ -41,18 +43,19 @@ export function MessageBlock({
   return (
     <Box flexDirection="column" marginBottom={1} flexShrink={0}>
       <Text>
+        <Text color="cyan" bold>{current ? "› " : "  "}</Text>
         <Text color={color} bold={isPrimary}>▍ </Text>
         <Text
           color={color}
-          bold={isPrimary}
+          bold={isPrimary || current}
           italic={message.role === "system"}
-          dimColor={isMuted}
+          dimColor={isMuted && !current}
         >
           {headerText}
         </Text>
         <Text dimColor>  ·  {time}</Text>
       </Text>
-      <Box paddingLeft={2}>
+      <Box paddingLeft={4}>
         <Body message={message} expanded={expanded} />
       </Box>
     </Box>
