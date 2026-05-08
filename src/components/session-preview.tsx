@@ -236,7 +236,8 @@ export function SessionPreview({
     if (!focused) return;
     if (searchOpen) return;
 
-    const inAfterglow = !searchOpen && committedQuery !== "";
+    // searchOpen is already guarded above; just check the committed query.
+    const inAfterglow = committedQuery !== "";
     const isOrdinaryNav =
       key.upArrow || key.downArrow || key.leftArrow || key.rightArrow ||
       input === "j" || input === "k" || input === "g" || input === "G" ||
