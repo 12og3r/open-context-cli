@@ -13,7 +13,7 @@ const MESSAGES: Message[] = [
 describe("SessionPreview", () => {
   test("starts scrolled to the bottom (most recent visible)", () => {
     const { lastFrame } = render(
-      <SessionPreview messages={MESSAGES} focused={false} height={6} width={40} emoji={false} />
+      <SessionPreview messages={MESSAGES} sessionId="a" focused={false} height={6} width={40} emoji={false} />
     );
     const out = lastFrame() ?? "";
     expect(out).toContain("the most recent user");
@@ -21,7 +21,7 @@ describe("SessionPreview", () => {
 
   test("renders an empty placeholder when there are no messages", () => {
     const { lastFrame } = render(
-      <SessionPreview messages={[]} focused={false} height={6} width={40} emoji={false} />
+      <SessionPreview messages={[]} sessionId={null} focused={false} height={6} width={40} emoji={false} />
     );
     expect(lastFrame() ?? "").toContain("(no messages)");
   });

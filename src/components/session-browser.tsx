@@ -118,6 +118,7 @@ export function SessionBrowser({
           {(detail.status === "ready" || detail.status === "loading") && (
             <SessionPreview
               messages={"messages" in detail ? detail.messages : detail.partial}
+              sessionId={selected?.id ?? null}
               focused={previewFocused}
               height={innerHeight}
               width={rightInnerWidth}

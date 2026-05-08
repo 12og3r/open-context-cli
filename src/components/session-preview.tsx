@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import type { Message } from "../providers/types.ts";
 import { renderConversation } from "../lib/render-message.ts";
@@ -6,27 +6,43 @@ import { SearchBar } from "./search-bar.tsx";
 
 export function SessionPreview({
   messages,
+  sessionId,
   focused,
   height,
   width,
   emoji = true,
 }: {
   messages: Message[];
+  sessionId: string | null;
   focused: boolean;
   height: number;
   width: number;
   emoji?: boolean;
 }) {
-  const [cursor, setCursor] = useState(Math.max(0, messages.length - 1));
-  const [scrollLine, setScrollLine] = useState(Number.MAX_SAFE_INTEGER);
+  const [cursor, setCursor] = useState(0);
+  // While pinToBottom is true, the cursor follows the most recent message
+  // automatically. The user "unpins" by moving the cursor, but session-switch
+  // re-pins so a new session opens at the latest.
+  const [pinToBottom, setPinToBottom] = useState(true);
+  const [scrollLine, setScrollLine] = useState(0);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [committedQuery, setCommittedQuery] = useState("");
-  const lastIdent = useRef<number | null>(null);
+
+  // Reset only on real session switch.
+  useEffect(() => {
+    setPinToBottom(true);
+    setCursor(0);
+    setScrollLine(0);
+    setExpanded(new Set());
+    setSearchOpen(false);
+    setSearchValue("");
+    setCommittedQuery("");
+  }, [sessionId]);
 
   const lastIdx = Math.max(0, messages.length - 1);
-  const safeCursor = Math.min(cursor, lastIdx);
+  const effectiveCursor = pinToBottom ? lastIdx : Math.min(cursor, lastIdx);
 
   // Reserve 1 row for the overflow hint.
   const viewportHeight = Math.max(1, height - 1 - (searchOpen ? 1 : 0));
@@ -37,55 +53,49 @@ export function SessionPreview({
     () =>
       renderConversation(messages, {
         width,
-        cursor: safeCursor,
+        cursor: effectiveCursor,
         focused,
         expanded,
         emoji,
         now: new Date(),
         query,
       }),
-    [messages, width, safeCursor, focused, expanded, emoji, query],
+    [messages, width, effectiveCursor, focused, expanded, emoji, query],
   );
 
-  // Reset on session switch — cursor at latest, scrolled so latest is at the bottom of the viewport.
-  useEffect(() => {
-    const ident = messages.length;
-    if (lastIdent.current !== ident) {
-      const c = Math.max(0, ident - 1);
-      setCursor(c);
-      setExpanded(new Set());
-      setSearchOpen(false);
-      setSearchValue("");
-      setCommittedQuery("");
-      // Sentinel: clampScroll will pull this down to the valid bottom on the
-      // first render that has a buffer.
-      setScrollLine(Number.MAX_SAFE_INTEGER);
-      lastIdent.current = ident;
-    }
-  }, [messages]);
+  const cursorStart = buffer.startLine[effectiveCursor] ?? 0;
+  const cursorEnd = buffer.endLine[effectiveCursor] ?? buffer.lines.length;
 
-  // Compute the actual scroll offset for this render, so the very first paint
-  // already shows the cursor's lines without waiting for a useEffect tick.
-  const cursorStart = buffer.startLine[safeCursor] ?? 0;
-  const cursorEnd = buffer.endLine[safeCursor] ?? buffer.lines.length;
-  const actualScrollLine = clampScroll(
-    scrollLine,
-    cursorStart,
-    cursorEnd,
-    viewportHeight,
-    buffer.lines.length,
-  );
+  // While pinned, always anchor the viewport to the bottom of the buffer so
+  // the latest message sits at the bottom even as messages stream in.
+  // Otherwise, only shift when the cursor's lines would leave the viewport.
+  const actualScrollLine = pinToBottom
+    ? Math.max(0, buffer.lines.length - viewportHeight)
+    : clampScroll(scrollLine, cursorStart, cursorEnd, viewportHeight, buffer.lines.length);
 
   // Persist the clamped value so subsequent user actions start from the right place.
   useEffect(() => {
     if (actualScrollLine !== scrollLine) setScrollLine(actualScrollLine);
   }, [actualScrollLine, scrollLine]);
 
+  const moveCursorTo = (next: number) => {
+    const clamped = Math.max(0, Math.min(lastIdx, next));
+    if (clamped === effectiveCursor && !pinToBottom) return;
+    if (clamped === effectiveCursor && pinToBottom && clamped === lastIdx) {
+      // No-op: pinned at last and trying to go past it.
+      return;
+    }
+    setCursor(clamped);
+    setPinToBottom(clamped === lastIdx);
+  };
+
   const doScroll = (delta: number) => {
     const max = Math.max(0, buffer.lines.length - viewportHeight);
     const next = Math.max(0, Math.min(max, actualScrollLine + delta));
     setScrollLine(next);
-    setCursor(c => moveCursorToVisible(c, next, viewportHeight, buffer, lastIdx, delta));
+    const newCursor = moveCursorToVisible(effectiveCursor, next, viewportHeight, buffer, lastIdx, delta);
+    setCursor(newCursor);
+    setPinToBottom(newCursor === lastIdx && next >= max);
   };
 
   useInput((input, key) => {
@@ -95,19 +105,22 @@ export function SessionPreview({
       setSearchOpen(true);
       return;
     }
-    if (input === "j" || key.downArrow) setCursor(c => Math.min(lastIdx, c + 1));
-    else if (input === "k" || key.upArrow) setCursor(c => Math.max(0, c - 1));
+    if (input === "j" || key.downArrow) moveCursorTo(effectiveCursor + 1);
+    else if (input === "k" || key.upArrow) moveCursorTo(effectiveCursor - 1);
     else if (key.ctrl && input === "d") doScroll(Math.floor(viewportHeight / 2));
     else if (key.ctrl && input === "u") doScroll(-Math.floor(viewportHeight / 2));
     else if (key.pageDown) doScroll(viewportHeight);
     else if (key.pageUp) doScroll(-viewportHeight);
-    else if (input === "G") setCursor(lastIdx);
-    else if (input === "g") setCursor(0);
+    else if (input === "G") {
+      setPinToBottom(true);
+      setCursor(lastIdx);
+    }
+    else if (input === "g") moveCursorTo(0);
     else if (key.tab && !key.shift) {
       setExpanded(prev => {
         const next = new Set(prev);
-        if (next.has(safeCursor)) next.delete(safeCursor);
-        else next.add(safeCursor);
+        if (next.has(effectiveCursor)) next.delete(effectiveCursor);
+        else next.add(effectiveCursor);
         return next;
       });
     }
@@ -145,7 +158,7 @@ export function SessionPreview({
         <Box flexShrink={0}>
           <Text dimColor>
             {hasAbove ? "  ↑ " : "    "}
-            {safeCursor + 1} / {messages.length}
+            {effectiveCursor + 1} / {messages.length}
             {hasBelow ? "  ↓" : "   "}
           </Text>
         </Box>
@@ -162,12 +175,8 @@ function clampScroll(
   totalLines: number,
 ): number {
   let s = prev;
-  // Cursor's first line above viewport → scroll up so cursor's start is at top.
   if (cursorStart < s) s = cursorStart;
-  // Cursor's last line past the viewport bottom → scroll just enough so it
-  // ends at the viewport bottom.
   if (cursorEnd > s + viewportHeight) s = cursorEnd - viewportHeight;
-  // Keep within bounds.
   if (s < 0) s = 0;
   const max = Math.max(0, totalLines - viewportHeight);
   if (s > max) s = max;
@@ -188,15 +197,13 @@ function moveCursorToVisible(
   if (cursor > lastIdx) return lastIdx;
   const start = buffer.startLine[cursor] ?? 0;
   const end = buffer.endLine[cursor] ?? 0;
-  if (start >= top && end <= bottom) return cursor; // still fully visible
+  if (start >= top && end <= bottom) return cursor;
   if (direction < 0) {
-    // Scrolling up → put cursor on the topmost message whose start is in view.
     for (let i = 0; i <= lastIdx; i++) {
       if ((buffer.startLine[i] ?? 0) >= top) return i;
     }
     return cursor;
   } else {
-    // Scrolling down → put cursor on the bottommost message whose end fits.
     for (let i = lastIdx; i >= 0; i--) {
       if ((buffer.endLine[i] ?? 0) <= bottom) return i;
     }
