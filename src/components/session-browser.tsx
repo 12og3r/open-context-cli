@@ -106,19 +106,14 @@ export function SessionBrowser({
           title="PREVIEW"
           meta={selected ? truncateProject(selected.projectPath, rightInnerWidth - 16) : ""}
         >
-          {detail.status === "loading" && (
-            <Box>
-              <Text color={ACCENT}><Spinner /></Text>
-              <Text dimColor> loading messages…</Text>
-            </Box>
-          )}
           {detail.status === "error" && (
             <Text color="red">! {detail.error.message}</Text>
           )}
-          {detail.status === "ready" && (
+          {(detail.status === "ready" || detail.status === "loading") && (
             <SessionPreview
-              messages={detail.messages}
+              messages={detail.status === "ready" ? detail.messages : detail.partial}
               sessionId={selected?.id ?? null}
+              loading={detail.status === "loading"}
               focused={previewFocused}
               height={innerHeight}
               width={rightInnerWidth}

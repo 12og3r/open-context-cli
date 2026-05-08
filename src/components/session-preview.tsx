@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
+import Spinner from "ink-spinner";
 import type { Message } from "../providers/types.ts";
 import { applyCursorOverlay, renderConversation } from "../lib/render-message.ts";
 import { SearchBar } from "./search-bar.tsx";
@@ -7,6 +8,7 @@ import { SearchBar } from "./search-bar.tsx";
 export function SessionPreview({
   messages,
   sessionId,
+  loading = false,
   focused,
   height,
   width,
@@ -14,6 +16,7 @@ export function SessionPreview({
 }: {
   messages: Message[];
   sessionId: string | null;
+  loading?: boolean;
   focused: boolean;
   height: number;
   width: number;
@@ -158,7 +161,14 @@ export function SessionPreview({
   if (messages.length === 0) {
     return (
       <Box width={width} height={height} alignItems="center" justifyContent="center">
-        <Text dimColor>(no messages)</Text>
+        {loading ? (
+          <Box>
+            <Text color="cyan"><Spinner /></Text>
+            <Text dimColor> loading messages…</Text>
+          </Box>
+        ) : (
+          <Text dimColor>(no messages)</Text>
+        )}
       </Box>
     );
   }
@@ -201,13 +211,20 @@ export function SessionPreview({
           <Text key={i} wrap="truncate">{line || " "}</Text>
         ))}
       </Box>
-      {showOverflowHint && (
+      {(showOverflowHint || loading) && (
         <Box flexShrink={0}>
           <Text dimColor>
             {hasAbove ? "  ↑ " : "    "}
             {effectiveCursor + 1} / {messages.length}
             {hasBelow ? "  ↓" : "   "}
           </Text>
+          {loading && (
+            <Text dimColor>
+              {"   "}
+              <Text color="cyan"><Spinner /></Text>
+              {" loading…"}
+            </Text>
+          )}
         </Box>
       )}
     </Box>

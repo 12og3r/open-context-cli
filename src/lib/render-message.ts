@@ -120,11 +120,50 @@ export function renderMessageLines(message: Message, opts: RenderMessageOpts): s
   return out;
 }
 
+// Per-message render cache. Keyed by the Message object reference (so it's
+// automatically dropped when the session is evicted from useSessionDetail's
+// detailCache). Within each bucket we keep a small set of variant renderings
+// keyed by the rendering options that affect line content.
+const messageLineCache = new WeakMap<Message, Map<string, string[]>>();
+const PER_MESSAGE_CACHE_LIMIT = 4;
+
+function memoRenderMessageLines(
+  message: Message,
+  width: number,
+  expanded: boolean,
+  emoji: boolean,
+  now: Date,
+): string[] {
+  let bucket = messageLineCache.get(message);
+  if (!bucket) {
+    bucket = new Map();
+    messageLineCache.set(message, bucket);
+  }
+  // Round 'now' to the minute so cached line entries don't churn on every
+  // render but still pick up "Nm ago → (N+1)m ago" eventually.
+  const nowMin = Math.floor(now.getTime() / 60_000);
+  const key = `${width}|${emoji ? 1 : 0}|${expanded ? 1 : 0}|${nowMin}`;
+  const cached = bucket.get(key);
+  if (cached !== undefined) return cached;
+
+  const lines = renderMessageLines(message, { width, current: false, expanded, emoji, now });
+  bucket.set(key, lines);
+  if (bucket.size > PER_MESSAGE_CACHE_LIMIT) {
+    const firstKey: string | undefined = bucket.keys().next().value;
+    if (firstKey !== undefined) bucket.delete(firstKey);
+  }
+  return lines;
+}
+
 /**
  * Render the full conversation into a flat line buffer plus per-message line
  * ranges. The buffer does NOT include cursor highlighting — that gets applied
  * cheaply at view time via `applyCursorOverlay`, so we don't have to rebuild
  * the whole conversation when the cursor moves.
+ *
+ * Per-message rendering is memoized by Message identity, so revisiting a
+ * session whose messages are still alive in detailCache is effectively free
+ * (the loop just hands back cached line arrays).
  */
 export function renderConversation(
   messages: Message[],
@@ -140,19 +179,26 @@ export function renderConversation(
   startLine: number[];   // startLine[i] = first line index of message i
   endLine: number[];     // endLine[i]   = first line index AFTER message i
 } {
-  const { messages: hl } = applyHighlight(messages, opts.query);
+  // Highlighted messages are new objects, so we only memoize when there is no
+  // search query. With a query active we accept the rebuild cost — searches
+  // are interactive and infrequent compared to navigation.
+  const useCache = !opts.query;
+  const hl = useCache ? messages : applyHighlight(messages, opts.query).messages;
+
   const lines: string[] = [];
   const startLine: number[] = new Array(hl.length);
   const endLine: number[] = new Array(hl.length);
   for (let i = 0; i < hl.length; i++) {
     startLine[i] = lines.length;
-    const msgLines = renderMessageLines(hl[i]!, {
-      width: opts.width,
-      current: false,
-      expanded: opts.expanded.has(i),
-      emoji: opts.emoji,
-      now: opts.now,
-    });
+    const msgLines = useCache
+      ? memoRenderMessageLines(hl[i]!, opts.width, opts.expanded.has(i), opts.emoji, opts.now)
+      : renderMessageLines(hl[i]!, {
+          width: opts.width,
+          current: false,
+          expanded: opts.expanded.has(i),
+          emoji: opts.emoji,
+          now: opts.now,
+        });
     for (const ml of msgLines) lines.push(ml);
     endLine[i] = lines.length;
   }
