@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "bun run src/cli.tsx",
     "build": "bun build src/cli.tsx --outdir dist --target node --format esm --packages external",
-    "test": "bun test",
+    "test": "FORCE_COLOR=1 bun test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

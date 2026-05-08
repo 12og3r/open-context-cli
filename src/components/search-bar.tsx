@@ -1,23 +1,51 @@
 // src/components/search-bar.tsx
 import React from "react";
 import { Box, Text } from "ink";
-import TextInput from "ink-text-input";
+import { MinimalInput } from "./minimal-input.tsx";
 
 export function SearchBar({
-  label,
   value,
   onChange,
   onSubmit,
+  onCancel,
+  onPrev,
+  onNext,
+  matchIndex,
+  matchCount,
 }: {
-  label: React.ReactNode;
   value: string;
   onChange: (s: string) => void;
-  onSubmit: (s: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  matchIndex: number;
+  matchCount: number;
 }) {
+  const hasQuery = value.length > 0;
+  const zero = hasQuery && matchCount === 0;
+  const counterText = !hasQuery
+    ? ""
+    : matchCount === 0
+      ? "0 / 0"
+      : `${matchIndex + 1} / ${matchCount}`;
+
   return (
     <Box>
-      {typeof label === "string" ? <Text>{label} </Text> : <>{label}<Text> </Text></>}
-      <TextInput value={value} onChange={onChange} onSubmit={onSubmit} />
+      <Text color={zero ? "red" : "cyan"}>🔎 </Text>
+      <Box flexGrow={1}>
+        <MinimalInput
+          value={value}
+          onChange={onChange}
+          onSubmit={onSubmit}
+          onCancel={onCancel}
+          onPrev={onPrev}
+          onNext={onNext}
+        />
+      </Box>
+      <Box marginLeft={1}>
+        <Text color={zero ? "red" : "gray"}>{counterText}</Text>
+      </Box>
     </Box>
   );
 }

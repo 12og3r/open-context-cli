@@ -36,6 +36,7 @@ export function SessionPreview({
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [committedQuery, setCommittedQuery] = useState("");
+  const [matchIndex, setMatchIndex] = useState<number>(-1);
 
   // Reset only on real session switch.
   useEffect(() => {
@@ -46,6 +47,7 @@ export function SessionPreview({
     setSearchOpen(false);
     setSearchValue("");
     setCommittedQuery("");
+    setMatchIndex(-1);
   }, [sessionId]);
 
   const lastIdx = Math.max(0, messages.length - 1);
@@ -68,8 +70,7 @@ export function SessionPreview({
       try {
         const result = await renderConversationAsync(
           messages,
-          // matchIndex: -1 is a placeholder until Task 6 wires it to state.
-          { width, expanded, emoji, now: new Date(), query, matchIndex: -1 },
+          { width, expanded, emoji, now: new Date(), query, matchIndex },
           () => cancelled,
         );
         if (cancelled) return;
@@ -81,7 +82,10 @@ export function SessionPreview({
       }
     })();
     return () => { cancelled = true; };
-  }, [messages, width, expanded, emoji, query]);
+  }, [messages, width, expanded, emoji, query, matchIndex]);
+
+  const matches = buffer.matches;
+  const matchCount = matches.length;
 
   const totalLines = buffer.lines.length;
   const maxScroll = Math.max(0, totalLines - viewportHeight);
@@ -166,8 +170,12 @@ export function SessionPreview({
       setCursor(0);
       setScrollLine(0);
     }
-    else if (key.tab && !key.shift) {
+    else if ((key.tab && !key.shift) || key.return) {
       const target = pinToBottom ? lastIdx : effectiveCursor;
+      if (key.return) {
+        const role = messages[target]?.role;
+        if (role !== "tool_use" && role !== "tool_result") return;
+      }
       setExpanded(prev => {
         const next = new Set(prev);
         if (next.has(target)) next.delete(target);
@@ -223,10 +231,14 @@ export function SessionPreview({
     <Box flexDirection="column" width={width} height={height}>
       {searchOpen && (
         <SearchBar
-          label={<Text color="cyan">🔎</Text>}
           value={searchValue}
           onChange={setSearchValue}
-          onSubmit={(v) => { setCommittedQuery(v); setSearchOpen(false); }}
+          onSubmit={() => { setCommittedQuery(searchValue); setSearchOpen(false); }}
+          onCancel={() => { setCommittedQuery(searchValue); setSearchOpen(false); }}
+          onPrev={() => { /* Task 8 */ }}
+          onNext={() => { /* Task 8 */ }}
+          matchIndex={matchIndex}
+          matchCount={matchCount}
         />
       )}
       <Box flexDirection="column" flexGrow={1}>

@@ -84,10 +84,14 @@ export function SessionBrowser({
         >
           {searchOpen ? (
             <SearchBar
-              label={<Text color={ACCENT}>›</Text>}
               value={filter}
               onChange={setFilter}
-              onSubmit={(v) => { setCommittedFilter(v); setSearchOpen(false); setSelectedIdx(0); }}
+              onSubmit={() => { setCommittedFilter(filter); setSearchOpen(false); setSelectedIdx(0); }}
+              onCancel={() => { setCommittedFilter(filter); setSearchOpen(false); }}
+              onPrev={() => {}}
+              onNext={() => {}}
+              matchIndex={-1}
+              matchCount={0}
             />
           ) : null}
           <SessionList
