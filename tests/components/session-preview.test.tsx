@@ -28,4 +28,25 @@ describe("SessionPreview", () => {
     );
     expect(lastFrame() ?? "").toContain("(no messages)");
   });
+
+  test("Ctrl+F sets matchIndex to the first match at or after current cursor", async () => {
+    const messages = [
+      { role: "assistant", content: "no match", timestamp: new Date(0), raw: {} },
+      { role: "assistant", content: "useState here", timestamp: new Date(0), raw: {} },
+      { role: "assistant", content: "another useState", timestamp: new Date(0), raw: {} },
+    ] as const as Message[];
+
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="x" focused={true}
+                      height={20} width={60} emoji={false} />
+    );
+    await tick();
+    // pinned to bottom = cursor on msg[2]; open search and type
+    stdin.write("\x06"); // Ctrl+F
+    await tick();
+    stdin.write("useState");
+    await tick();
+    // counter should be "2 / 2" because cursor is on msg[2] and the second match is in msg[2]
+    expect(lastFrame() ?? "").toContain("2 / 2");
+  });
 });

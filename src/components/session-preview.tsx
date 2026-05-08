@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import type { Message } from "../providers/types.ts";
@@ -9,6 +9,7 @@ import {
   type ConversationBuffer,
 } from "../lib/render-message.ts";
 import { SearchBar } from "./search-bar.tsx";
+import type { Match } from "../lib/matches.ts";
 
 const EMPTY_BUFFER: ConversationBuffer = { lines: [], startLine: [], endLine: [], matches: [] };
 
@@ -95,6 +96,50 @@ export function SessionPreview({
   useEffect(() => {
     if (!pinToBottom && actualScrollLine !== scrollLine) setScrollLine(actualScrollLine);
   }, [actualScrollLine, scrollLine, pinToBottom]);
+
+  // Scroll the viewport so that match `m` is visible.
+  const scrollMatchIntoView = (m: Match) => {
+    const msgStart = buffer.startLine[m.msgIndex] ?? 0;
+    const msgEnd = buffer.endLine[m.msgIndex] ?? totalLines;
+    const msgHeight = Math.max(1, msgEnd - msgStart);
+    const content = messages[m.msgIndex]?.content ?? "";
+    const fraction = content.length > 0 ? m.contentOffset / content.length : 0;
+    const approxLine = msgStart + Math.floor(fraction * msgHeight);
+    if (approxLine < actualScrollLine || approxLine >= actualScrollLine + viewportHeight) {
+      setScrollLine(clampToRange(approxLine - 2, 0, maxScroll));
+    }
+  };
+
+  // Track the (searchOpen, query, messages.length) tuple for which we last set
+  // the initial matchIndex. Using a ref avoids adding matchIndex to the dep
+  // array (which would cause a loop: effect sets matchIndex → re-render →
+  // matches identity changes → effect re-runs → ...).
+  const lastInitKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!searchOpen) { lastInitKey.current = null; return; }
+    if (matches.length === 0) { setMatchIndex(-1); return; }
+
+    // Only run once per (searchOpen, query, messages.length) tuple.
+    const initKey = `${query}|${messages.length}`;
+    if (lastInitKey.current === initKey) return;
+    lastInitKey.current = initKey;
+
+    // First match at or after current cursor; wrap to 0 if none.
+    const startCursor = pinToBottom ? lastIdx : Math.min(cursor, lastIdx);
+    const firstAfter = matches.findIndex(m => m.msgIndex >= startCursor);
+    const idx = firstAfter >= 0 ? firstAfter : 0;
+    setMatchIndex(idx);
+
+    // Sync conversation cursor and viewport to the chosen match.
+    const target = matches[idx]!;
+    setCursor(target.msgIndex);
+    setPinToBottom(false);
+    scrollMatchIntoView(target);
+  // matches is derived from buffer.matches which changes as buffer updates
+  // after async render; include it so we re-run once the buffer catches up.
+  // The loop risk is mitigated by the initKey guard above.
+  }, [searchOpen, query, messages, matches]);
 
   // Step the viewport by `delta` lines. Cursor only crosses to a neighbor when
   // that neighbor's first line is visible in the post-scroll viewport. As a
