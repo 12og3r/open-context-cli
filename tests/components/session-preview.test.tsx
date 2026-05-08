@@ -167,4 +167,42 @@ describe("SessionPreview", () => {
     expect(lastFrame() ?? "").not.toContain("\x1b[43m");
     expect(lastFrame() ?? "").not.toContain("\x1b[7m"); // no INVERSE either
   });
+
+  test("/ opens the search bar", async () => {
+    const messages = [
+      { role: "user", content: "hello world", timestamp: new Date(0), raw: {} },
+    ] as Message[];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="x" focused={true}
+                      height={10} width={40} emoji={false} />
+    );
+    await tick();
+    stdin.write("/");
+    await tick();
+    expect(lastFrame() ?? "").toContain("🔎");
+  });
+
+  test("Ctrl+F in afterglow clears the previous query and reopens with empty input", async () => {
+    const messages = [
+      { role: "user", content: "aaa bbb", timestamp: new Date(0), raw: {} },
+    ] as Message[];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="x" focused={true}
+                      height={10} width={40} emoji={false} />
+    );
+    await tick();
+    stdin.write("\x06");
+    await tick();
+    stdin.write("aaa");
+    await tick();
+    stdin.write("\r"); // commit -> afterglow
+    await tick();
+    expect(lastFrame() ?? "").toContain("\x1b[43m");
+    stdin.write("\x06"); // Ctrl+F again
+    await tick();
+    // Search bar is open with empty query (no counter visible).
+    const out = lastFrame() ?? "";
+    expect(out).toContain("🔎");
+    expect(out).not.toMatch(/\d+ \/ \d+/);
+  });
 });

@@ -251,8 +251,15 @@ export function SessionPreview({
       // Fall through — the key still performs its normal action below.
     }
 
-    if (key.ctrl && (input === "f" || input === "F")) {
+    const openSearchFresh = () => {
+      setCommittedQuery("");
+      setSearchValue("");
+      setMatchIndex(-1);
       setSearchOpen(true);
+    };
+
+    if ((key.ctrl && (input === "f" || input === "F")) || input === "/") {
+      openSearchFresh();
       return;
     }
     if (input === "j" || key.downArrow) step(1);
