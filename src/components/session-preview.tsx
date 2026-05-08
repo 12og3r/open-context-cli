@@ -1,8 +1,16 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
+import Spinner from "ink-spinner";
 import type { Message } from "../providers/types.ts";
-import { applyCursorOverlay, renderConversation } from "../lib/render-message.ts";
+import {
+  applyCursorOverlay,
+  CancelledError,
+  renderConversationAsync,
+  type ConversationBuffer,
+} from "../lib/render-message.ts";
 import { SearchBar } from "./search-bar.tsx";
+
+const EMPTY_BUFFER: ConversationBuffer = { lines: [], startLine: [], endLine: [] };
 
 export function SessionPreview({
   messages,
@@ -46,20 +54,33 @@ export function SessionPreview({
 
   const effectiveCursor = pinToBottom ? lastIdx : Math.min(cursor, lastIdx);
 
-  // Cursor doesn't enter the deps — cursor styling is applied as a cheap
-  // overlay at render time, so j/k don't trigger a full re-render of every
-  // message's markdown.
-  const buffer = useMemo(
-    () =>
-      renderConversation(messages, {
-        width,
-        expanded,
-        emoji,
-        now: new Date(),
-        query,
-      }),
-    [messages, width, expanded, emoji, query],
-  );
+  // The buffer is built off the render path so a heavy markdown→ANSI pass
+  // (~700 ms on a 1000-message session) doesn't block the React commit
+  // phase or the terminal-input handlers. While the build is in flight we
+  // show a spinner; the build is cancelled if the inputs change underneath.
+  const [buffer, setBuffer] = useState<ConversationBuffer>(EMPTY_BUFFER);
+  const [isBuilding, setIsBuilding] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsBuilding(true);
+    (async () => {
+      try {
+        const result = await renderConversationAsync(
+          messages,
+          { width, expanded, emoji, now: new Date(), query },
+          () => cancelled,
+        );
+        if (cancelled) return;
+        setBuffer(result);
+        setIsBuilding(false);
+      } catch (err) {
+        if (err instanceof CancelledError) return;
+        throw err;
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [messages, width, expanded, emoji, query]);
 
   const totalLines = buffer.lines.length;
   const maxScroll = Math.max(0, totalLines - viewportHeight);
@@ -159,6 +180,17 @@ export function SessionPreview({
     return (
       <Box width={width} height={height} alignItems="center" justifyContent="center">
         <Text dimColor>(no messages)</Text>
+      </Box>
+    );
+  }
+
+  if (isBuilding) {
+    return (
+      <Box width={width} height={height} alignItems="center" justifyContent="center">
+        <Box>
+          <Text color="cyan"><Spinner /></Text>
+          <Text dimColor> rendering…</Text>
+        </Box>
       </Box>
     );
   }

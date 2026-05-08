@@ -155,54 +155,96 @@ function memoRenderMessageLines(
   return lines;
 }
 
-/**
- * Render the full conversation into a flat line buffer plus per-message line
- * ranges. The buffer does NOT include cursor highlighting — that gets applied
- * cheaply at view time via `applyCursorOverlay`, so we don't have to rebuild
- * the whole conversation when the cursor moves.
- *
- * Per-message rendering is memoized by Message identity, so revisiting a
- * session whose messages are still alive in detailCache is effectively free
- * (the loop just hands back cached line arrays).
- */
-export function renderConversation(
-  messages: Message[],
-  opts: {
-    width: number;
-    expanded: Set<number>;
-    emoji: boolean;
-    now: Date;
-    query: string;
-  },
-): {
+export type ConversationBuffer = {
   lines: string[];
-  startLine: number[];   // startLine[i] = first line index of message i
-  endLine: number[];     // endLine[i]   = first line index AFTER message i
-} {
-  // Highlighted messages are new objects, so we only memoize when there is no
-  // search query. With a query active we accept the rebuild cost — searches
-  // are interactive and infrequent compared to navigation.
+  startLine: number[];
+  endLine: number[];
+};
+
+export type RenderConversationOpts = {
+  width: number;
+  expanded: Set<number>;
+  emoji: boolean;
+  now: Date;
+  query: string;
+};
+
+const YIELD_EVERY = 64;
+
+/**
+ * Synchronous render — keep for tests and tiny fixtures. Real previews use
+ * `renderConversationAsync` so the markdown→ANSI pass for big sessions
+ * doesn't block the React commit / event loop.
+ */
+export function renderConversation(messages: Message[], opts: RenderConversationOpts): ConversationBuffer {
   const useCache = !opts.query;
   const hl = useCache ? messages : applyHighlight(messages, opts.query).messages;
-
   const lines: string[] = [];
   const startLine: number[] = new Array(hl.length);
   const endLine: number[] = new Array(hl.length);
   for (let i = 0; i < hl.length; i++) {
     startLine[i] = lines.length;
-    const msgLines = useCache
-      ? memoRenderMessageLines(hl[i]!, opts.width, opts.expanded.has(i), opts.emoji, opts.now)
-      : renderMessageLines(hl[i]!, {
-          width: opts.width,
-          current: false,
-          expanded: opts.expanded.has(i),
-          emoji: opts.emoji,
-          now: opts.now,
-        });
+    const msgLines = renderOne(hl[i]!, opts, useCache, i);
     for (const ml of msgLines) lines.push(ml);
     endLine[i] = lines.length;
   }
   return { lines, startLine, endLine };
+}
+
+/**
+ * Build the conversation buffer in chunks, yielding to the event loop every
+ * `YIELD_EVERY` messages so terminal input handlers can run while rendering.
+ * Per-message rendering is memoized via WeakMap, so revisiting a cached
+ * session completes in microseconds even though it still walks the loop.
+ *
+ * Throws a `CancelledError` if `isCancelled()` returns true between batches.
+ */
+export class CancelledError extends Error {
+  constructor() {
+    super("cancelled");
+    this.name = "CancelledError";
+  }
+}
+
+export async function renderConversationAsync(
+  messages: Message[],
+  opts: RenderConversationOpts,
+  isCancelled?: () => boolean,
+): Promise<ConversationBuffer> {
+  const useCache = !opts.query;
+  const hl = useCache ? messages : applyHighlight(messages, opts.query).messages;
+  const lines: string[] = [];
+  const startLine: number[] = new Array(hl.length);
+  const endLine: number[] = new Array(hl.length);
+  for (let i = 0; i < hl.length; i++) {
+    if (isCancelled?.()) throw new CancelledError();
+    startLine[i] = lines.length;
+    const msgLines = renderOne(hl[i]!, opts, useCache, i);
+    for (const ml of msgLines) lines.push(ml);
+    endLine[i] = lines.length;
+    if ((i + 1) % YIELD_EVERY === 0) {
+      await new Promise(resolve => setImmediate(resolve));
+    }
+  }
+  return { lines, startLine, endLine };
+}
+
+function renderOne(
+  message: Message,
+  opts: RenderConversationOpts,
+  useCache: boolean,
+  i: number,
+): string[] {
+  if (useCache) {
+    return memoRenderMessageLines(message, opts.width, opts.expanded.has(i), opts.emoji, opts.now);
+  }
+  return renderMessageLines(message, {
+    width: opts.width,
+    current: false,
+    expanded: opts.expanded.has(i),
+    emoji: opts.emoji,
+    now: opts.now,
+  });
 }
 
 /**

@@ -1,4 +1,3 @@
-// src/hooks/use-session-detail.ts
 import { useEffect, useState } from "react";
 import type { Message, SessionMeta, SessionProvider } from "../providers/types.ts";
 
@@ -9,6 +8,15 @@ type State =
 
 const detailCache = new Map<string, { mtimeMs: number; messages: Message[] }>();
 const MAX_CACHED = 50;
+
+// Yield to the macrotask queue every N messages so terminal input handlers
+// (keyboard navigation, cancellation) get a chance to run while a session
+// loads. Without this, the parsing loop monopolizes the event loop.
+const YIELD_EVERY = 64;
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise(resolve => setImmediate(resolve));
+}
 
 export function useSessionDetail(provider: SessionProvider, meta: SessionMeta | null): State {
   const [state, setState] = useState<State>({ status: "loading", partial: [] });
@@ -24,19 +32,21 @@ export function useSessionDetail(provider: SessionProvider, meta: SessionMeta | 
     }
 
     setState({ status: "loading", partial: [] });
-    const acc: Message[] = [];
+
     (async () => {
       try {
+        const acc: Message[] = [];
         for await (const m of provider.loadSession(meta.filePath)) {
           if (cancelled) return;
           acc.push(m);
-          // Update partial state every 16 messages so the UI shows progress.
-          if (acc.length % 16 === 0) {
-            setState({ status: "loading", partial: [...acc] });
+          // Yield periodically so navigation keys and the cleanup-driven
+          // `cancelled` flag get to run between batches.
+          if (acc.length % YIELD_EVERY === 0) {
+            await yieldToEventLoop();
+            if (cancelled) return;
           }
         }
         if (cancelled) return;
-        // LRU evict.
         if (detailCache.size >= MAX_CACHED) {
           const oldestKey = detailCache.keys().next().value as string | undefined;
           if (oldestKey) detailCache.delete(oldestKey);

@@ -10,11 +10,14 @@ const MESSAGES: Message[] = [
   { role: "user", content: "the most recent user", timestamp: new Date(0), raw: {} },
 ];
 
+const tick = () => new Promise(resolve => setTimeout(resolve, 30));
+
 describe("SessionPreview", () => {
-  test("starts scrolled to the bottom (most recent visible)", () => {
+  test("starts scrolled to the bottom (most recent visible)", async () => {
     const { lastFrame } = render(
       <SessionPreview messages={MESSAGES} sessionId="a" focused={false} height={6} width={40} emoji={false} />
     );
+    await tick();
     const out = lastFrame() ?? "";
     expect(out).toContain("the most recent user");
   });
