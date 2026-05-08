@@ -1,4 +1,3 @@
-// src/components/footer.tsx
 import React from "react";
 import { Box, Text } from "ink";
 
@@ -9,18 +8,26 @@ export type FooterContext =
   | "preview-search"
   | "path-input";
 
-const HINTS: Record<FooterContext, string> = {
-  "list":           " ↑/↓ select   Enter focus preview   / search   p path   q quit ",
-  "preview":        " ↑/↓ scroll   Esc back   ⌃F search-in-preview   Tab expand tool   q quit ",
-  "list-search":    " type to filter   Enter apply   Esc cancel ",
-  "preview-search": " type to search   Enter commit   Esc cancel ",
-  "path-input":     " type a path   Enter submit   Esc quit ",
+const HINTS: Record<FooterContext, string[]> = {
+  "list":           ["↑↓ select", "⏎ focus preview", "/ search", "p path", "q quit"],
+  "preview":        ["↑↓ scroll", "esc back", "⌃F find", "⇥ expand tool", "q quit"],
+  "list-search":    ["type to filter", "⏎ apply", "esc cancel"],
+  "preview-search": ["type to search", "⏎ commit", "esc cancel"],
+  "path-input":     ["type a path", "⏎ submit", "esc quit"],
 };
 
 export function Footer({ context }: { context: FooterContext }) {
+  const parts = HINTS[context];
   return (
-    <Box>
-      <Text inverse>{HINTS[context]}</Text>
+    <Box paddingX={2}>
+      <Text dimColor>
+        {parts.map((p, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && "  ·  "}
+            {p}
+          </React.Fragment>
+        ))}
+      </Text>
     </Box>
   );
 }

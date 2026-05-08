@@ -1,12 +1,15 @@
-// src/components/session-browser.tsx
 import React, { useMemo, useState } from "react";
 import { Box, Text, useInput, useStdout } from "ink";
+import Spinner from "ink-spinner";
 import type { SessionMeta, SessionProvider } from "../providers/types.ts";
 import { SessionList } from "./session-list.tsx";
 import { SessionPreview } from "./session-preview.tsx";
 import { SearchBar } from "./search-bar.tsx";
 import { Footer, type FooterContext } from "./footer.tsx";
 import { useSessionDetail } from "../hooks/use-session-detail.ts";
+
+const ACCENT = "cyan";
+const MUTED = "gray";
 
 export function SessionBrowser({
   provider,
@@ -24,9 +27,9 @@ export function SessionBrowser({
   const { stdout } = useStdout();
   const termWidth = stdout?.columns ?? 100;
   const termHeight = stdout?.rows ?? 30;
-  const leftWidth = Math.min(36, Math.floor(termWidth * 0.35));
-  const rightWidth = termWidth - leftWidth - 1;
-  const contentHeight = termHeight - 1; // footer
+  const leftWidth = Math.min(40, Math.max(28, Math.floor(termWidth * 0.32)));
+  const rightWidth = termWidth - leftWidth;
+  const contentHeight = termHeight - 2; // footer + 1 spacing line
 
   const [focus, setFocus] = useState<"list" | "preview">("list");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -60,53 +63,114 @@ export function SessionBrowser({
     }
   });
 
-  const footerContext: FooterContext =
-    searchOpen ? "list-search" : focus;
+  const footerContext: FooterContext = searchOpen ? "list-search" : focus;
+  const listFocused = focus === "list";
+  const previewFocused = focus === "preview";
+
+  // Inner widths (pane − 2 borders − 2 padding)
+  const leftInnerWidth = leftWidth - 4;
+  const rightInnerWidth = rightWidth - 4;
+  // Inner heights (pane − 2 borders − 1 header − 1 spacer)
+  const innerHeight = contentHeight - 4;
 
   return (
     <Box flexDirection="column" width={termWidth} height={termHeight}>
       <Box flexDirection="row" flexGrow={1}>
-        <Box
-          flexDirection="column"
+        <Pane
           width={leftWidth}
-          borderStyle="single"
-          borderTop={false}
-          borderBottom={false}
-          borderLeft={false}
+          focused={listFocused}
+          title={searchOpen ? "FILTER" : "SESSIONS"}
+          meta={searchOpen ? "" : `${filtered.length}`}
         >
           {searchOpen ? (
             <SearchBar
-              label="/"
+              label={<Text color={ACCENT}>›</Text>}
               value={filter}
               onChange={setFilter}
               onSubmit={(v) => { setCommittedFilter(v); setSearchOpen(false); setSelectedIdx(0); }}
             />
-          ) : (
-            <Text bold>Sessions ({filtered.length})</Text>
-          )}
+          ) : null}
           <SessionList
             sessions={filtered}
             selectedId={selected?.id ?? null}
-            width={leftWidth}
-            height={contentHeight - 1}
+            width={leftInnerWidth}
+            height={innerHeight - (searchOpen ? 1 : 0)}
           />
-        </Box>
-        <Box flexDirection="column" width={rightWidth}>
-          <Text bold>Preview</Text>
-          {detail.status === "loading" && <Text dimColor>Loading…</Text>}
-          {detail.status === "error" && <Text color="red">{detail.error.message}</Text>}
+          {filtered.length === 0 && !searchOpen && (
+            <Text dimColor>(no sessions)</Text>
+          )}
+        </Pane>
+        <Pane
+          width={rightWidth}
+          focused={previewFocused}
+          title="PREVIEW"
+          meta={selected ? truncateProject(selected.projectPath, rightInnerWidth - 16) : ""}
+        >
+          {detail.status === "loading" && (
+            <Box>
+              <Text color={ACCENT}><Spinner /></Text>
+              <Text dimColor> loading messages…</Text>
+            </Box>
+          )}
+          {detail.status === "error" && (
+            <Text color="red">! {detail.error.message}</Text>
+          )}
           {(detail.status === "ready" || detail.status === "loading") && (
             <SessionPreview
               messages={"messages" in detail ? detail.messages : detail.partial}
-              focused={focus === "preview"}
-              height={contentHeight - 2}
-              width={rightWidth}
+              focused={previewFocused}
+              height={innerHeight}
+              width={rightInnerWidth}
               emoji={emoji}
             />
           )}
-        </Box>
+        </Pane>
       </Box>
       <Footer context={footerContext} />
     </Box>
   );
+}
+
+function Pane({
+  width,
+  focused,
+  title,
+  meta,
+  children,
+}: {
+  width: number;
+  focused: boolean;
+  title: string;
+  meta?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box
+      flexDirection="column"
+      width={width}
+      borderStyle="round"
+      borderColor={focused ? ACCENT : MUTED}
+      paddingX={1}
+    >
+      <Box flexShrink={0}>
+        <Text color={focused ? ACCENT : undefined} bold={focused}>
+          {title}
+        </Text>
+        {meta && (
+          <Text dimColor>{"  "}{meta}</Text>
+        )}
+      </Box>
+      <Box height={1} flexShrink={0} />
+      <Box flexDirection="column" flexGrow={1}>
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
+function truncateProject(p: string, max: number): string {
+  if (!p) return "";
+  if (p.length <= max) return p;
+  if (max < 4) return "…";
+  return "…" + p.slice(p.length - (max - 1));
 }

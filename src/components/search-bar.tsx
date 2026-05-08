@@ -9,14 +9,14 @@ export function SearchBar({
   onChange,
   onSubmit,
 }: {
-  label: string;
+  label: React.ReactNode;
   value: string;
   onChange: (s: string) => void;
   onSubmit: (s: string) => void;
 }) {
   return (
     <Box>
-      <Text>{label} </Text>
+      {typeof label === "string" ? <Text>{label} </Text> : <>{label}<Text> </Text></>}
       <TextInput value={value} onChange={onChange} onSubmit={onSubmit} />
     </Box>
   );

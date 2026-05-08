@@ -29,19 +29,23 @@ describe("SessionList", () => {
     expect(out).toContain("18 msgs");
   });
 
-  test("renders a divider between items", () => {
+  test("separates adjacent items with a blank gap row", () => {
     const { lastFrame } = render(
       <SessionList sessions={SESSIONS} selectedId="a" width={36} now={NOW} />
     );
-    const out = lastFrame() ?? "";
-    expect(out).toContain("─");
+    const lines = (lastFrame() ?? "").split("\n");
+    // Find the line with the second item's metadata; the line before it should
+    // be the blank gap. Item layout: summary / metadata / blank / summary / metadata.
+    const idx = lines.findIndex(l => l.includes("Refactor parser"));
+    expect(idx).toBeGreaterThan(0);
+    expect(lines[idx - 1]?.trim()).toBe("");
   });
 
-  test("marks the selected item", () => {
+  test("marks the selected item with the cyan ▌ bar", () => {
     const { lastFrame } = render(
       <SessionList sessions={SESSIONS} selectedId="b" width={36} now={NOW} />
     );
     const lines = (lastFrame() ?? "").split("\n");
-    expect(lines.some(l => l.includes("▸") && l.includes("Refactor parser"))).toBe(true);
+    expect(lines.some(l => l.includes("▌") && l.includes("Refactor parser"))).toBe(true);
   });
 });

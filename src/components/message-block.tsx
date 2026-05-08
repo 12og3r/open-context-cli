@@ -34,13 +34,27 @@ export function MessageBlock({
 }) {
   const headerLabel = headerFor(message);
   const time = relativeTime(message.timestamp, now);
-  const header = `${emoji ? ROLE_EMOJI[message.role] + " " : ""}${headerLabel} · ${time}`;
+  const headerText = `${emoji ? ROLE_EMOJI[message.role] + " " : ""}${headerLabel}`;
+  const color = ROLE_COLOR[message.role];
+  const isPrimary = message.role === "user" || message.role === "assistant";
+  const isMuted = message.role === "system" || message.role === "tool_result";
   return (
-    <Box flexDirection="column" marginBottom={1}>
-      <Text color={ROLE_COLOR[message.role]} bold={message.role === "user" || message.role === "assistant"} italic={message.role === "system"} dimColor={message.role === "system" || message.role === "tool_result"}>
-        {header}
+    <Box flexDirection="column" marginBottom={1} flexShrink={0}>
+      <Text>
+        <Text color={color} bold={isPrimary}>▍ </Text>
+        <Text
+          color={color}
+          bold={isPrimary}
+          italic={message.role === "system"}
+          dimColor={isMuted}
+        >
+          {headerText}
+        </Text>
+        <Text dimColor>  ·  {time}</Text>
       </Text>
-      <Body message={message} expanded={expanded} />
+      <Box paddingLeft={2}>
+        <Body message={message} expanded={expanded} />
+      </Box>
     </Box>
   );
 }
@@ -58,8 +72,8 @@ function Body({ message, expanded }: { message: Message; expanded: boolean }) {
     if (!expanded) {
       const oneLine = (message.content || "").split("\n")[0] ?? "";
       const lineCount = (message.content || "").split("\n").length;
-      const tail = lineCount > 1 ? ` (${lineCount} lines)` : "";
-      return <Text dimColor>{`▸ ${oneLine}${tail}`}</Text>;
+      const tail = lineCount > 1 ? `  (${lineCount} lines)` : "";
+      return <Text dimColor wrap="truncate">{`▸ ${oneLine}${tail}`}</Text>;
     }
     return <Text dimColor>{message.content}</Text>;
   }
