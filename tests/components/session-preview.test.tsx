@@ -49,4 +49,47 @@ describe("SessionPreview", () => {
     // counter should be "2 / 2" because cursor is on msg[2] and the second match is in msg[2]
     expect(lastFrame() ?? "").toContain("2 / 2");
   });
+
+  test("↓ advances matchIndex; wraps at end", async () => {
+    const messages = [
+      { role: "user", content: "aa bb aa cc aa", timestamp: new Date(0), raw: {} },
+    ] as Message[];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="x" focused={true}
+                      height={10} width={40} emoji={false} />
+    );
+    await tick();
+    stdin.write("\x06"); // Ctrl+F
+    await tick();
+    stdin.write("aa");
+    await tick();
+    expect(lastFrame() ?? "").toContain("1 / 3");
+    stdin.write("\x1b[B"); // ↓
+    await tick();
+    expect(lastFrame() ?? "").toContain("2 / 3");
+    stdin.write("\x1b[B"); // ↓
+    await tick();
+    expect(lastFrame() ?? "").toContain("3 / 3");
+    stdin.write("\x1b[B"); // ↓ wraps
+    await tick();
+    expect(lastFrame() ?? "").toContain("1 / 3");
+  });
+
+  test("↑ goes back; wraps at start", async () => {
+    const messages = [
+      { role: "user", content: "aa bb aa", timestamp: new Date(0), raw: {} },
+    ] as Message[];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="x" focused={true}
+                      height={10} width={40} emoji={false} />
+    );
+    await tick();
+    stdin.write("\x06");
+    await tick();
+    stdin.write("aa");
+    await tick();
+    stdin.write("\x1b[A"); // ↑ from initial index wraps to last
+    await tick();
+    expect(lastFrame() ?? "").toContain("2 / 2");
+  });
 });

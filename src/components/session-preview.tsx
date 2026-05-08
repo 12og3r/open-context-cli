@@ -200,6 +200,28 @@ export function SessionPreview({
     setScrollLine(nextScroll);
   };
 
+  // goToMatch: single entry point for jumping to a match by index.
+  // Math.max(0, matchIndex) guards against -1, but in practice Task 7's init
+  // effect has already set matchIndex >= 0 before onNext/onPrev are reachable.
+  const goToMatch = (idx: number) => {
+    if (idx < 0 || idx >= matches.length) return;
+    const m = matches[idx]!;
+    setMatchIndex(idx);
+    setCursor(m.msgIndex);
+    setPinToBottom(false);
+    scrollMatchIntoView(m);
+  };
+
+  const onNext = () => {
+    if (matches.length === 0) return;
+    goToMatch((Math.max(0, matchIndex) + 1) % matches.length);
+  };
+
+  const onPrev = () => {
+    if (matches.length === 0) return;
+    goToMatch((Math.max(0, matchIndex) - 1 + matches.length) % matches.length);
+  };
+
   useInput((input, key) => {
     if (!focused) return;
     if (searchOpen) return;
@@ -287,8 +309,8 @@ export function SessionPreview({
           onChange={setSearchValue}
           onSubmit={() => { setCommittedQuery(searchValue); setSearchOpen(false); }}
           onCancel={() => { setCommittedQuery(searchValue); setSearchOpen(false); }}
-          onPrev={() => { /* Task 8 */ }}
-          onNext={() => { /* Task 8 */ }}
+          onPrev={onPrev}
+          onNext={onNext}
           matchIndex={matchIndex}
           matchCount={matchCount}
         />
