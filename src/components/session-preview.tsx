@@ -4,7 +4,7 @@ import type { Message } from "../providers/types.ts";
 import { MessageBlock } from "./message-block.tsx";
 import { SearchBar } from "./search-bar.tsx";
 
-const APPROX_ROWS_PER_MSG = 3;
+const APPROX_ROWS_PER_MSG = 4;
 
 export function SessionPreview({
   messages,
@@ -20,35 +20,53 @@ export function SessionPreview({
   emoji?: boolean;
 }) {
   const [cursor, setCursor] = useState(Math.max(0, messages.length - 1));
+  const [windowStart, setWindowStart] = useState(0);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
   const [committedQuery, setCommittedQuery] = useState("");
 
-  // Reset cursor/expansion when message stream changes (i.e., session switch).
   const ident = useMemo(() => messages.length, [messages]);
-  const lastIdent = useRef(-1);
+  const lastIdent = useRef<number | null>(null);
+
+  // Available rows for messages, accounting for search bar + overflow hint.
+  const fit = Math.max(
+    1,
+    Math.floor((height - (searchOpen ? 1 : 0) - 1) / APPROX_ROWS_PER_MSG),
+  );
+
+  const lastIdx = Math.max(0, messages.length - 1);
+  const safeCursor = Math.min(cursor, lastIdx);
+
+  // Reset on session switch — cursor at latest, window at the bottom.
   useEffect(() => {
     if (lastIdent.current !== ident) {
-      setCursor(Math.max(0, ident - 1));
+      const c = Math.max(0, ident - 1);
+      setCursor(c);
+      setWindowStart(Math.max(0, c - fit + 1));
       setExpanded(new Set());
       setSearchOpen(false);
       setSearchValue("");
       setCommittedQuery("");
       lastIdent.current = ident;
     }
-  }, [ident]);
+  }, [ident, fit]);
 
-  const fit = Math.max(1, Math.floor((height - (searchOpen ? 1 : 0)) / APPROX_ROWS_PER_MSG));
-  const lastIdx = Math.max(0, messages.length - 1);
-  const safeCursor = Math.min(cursor, lastIdx);
+  // Compute final windowStart for rendering. Persists state but also clamps
+  // to a valid range when messages or fit change underneath us.
+  const renderWindowStart = clampWindow(windowStart, safeCursor, fit, messages.length);
 
-  // Window: keep cursor inside [windowStart, windowStart + fit).
-  // Anchor cursor near the bottom of the window so users see context above it.
-  let windowStart = safeCursor - fit + 1;
-  windowStart = Math.max(0, windowStart);
-  windowStart = Math.min(windowStart, Math.max(0, messages.length - fit));
-  const windowEnd = Math.min(messages.length, windowStart + fit);
+  // Move the cursor and shift the window only if the cursor would otherwise
+  // leave the visible range.
+  const moveTo = (raw: number) => {
+    const next = Math.max(0, Math.min(lastIdx, raw));
+    setCursor(next);
+    setWindowStart(prev => {
+      const start = clampWindow(prev, next, fit, messages.length);
+      // The window shifts only when next is outside [start, start + fit).
+      return start;
+    });
+  };
 
   useInput((input, key) => {
     if (!focused) return;
@@ -57,16 +75,15 @@ export function SessionPreview({
       setSearchOpen(true);
       return;
     }
-    const max = lastIdx;
     const half = Math.max(1, Math.floor(fit / 2));
-    if (input === "j" || key.downArrow) setCursor(c => Math.min(max, c + 1));
-    else if (input === "k" || key.upArrow) setCursor(c => Math.max(0, c - 1));
-    else if (key.ctrl && input === "d") setCursor(c => Math.min(max, c + half));
-    else if (key.ctrl && input === "u") setCursor(c => Math.max(0, c - half));
-    else if (key.pageDown) setCursor(c => Math.min(max, c + fit));
-    else if (key.pageUp) setCursor(c => Math.max(0, c - fit));
-    else if (input === "G") setCursor(max);
-    else if (input === "g") setCursor(0);
+    if (input === "j" || key.downArrow) moveTo(safeCursor + 1);
+    else if (input === "k" || key.upArrow) moveTo(safeCursor - 1);
+    else if (key.ctrl && input === "d") moveTo(safeCursor + half);
+    else if (key.ctrl && input === "u") moveTo(safeCursor - half);
+    else if (key.pageDown) moveTo(safeCursor + fit);
+    else if (key.pageUp) moveTo(safeCursor - fit);
+    else if (input === "G") moveTo(lastIdx);
+    else if (input === "g") moveTo(0);
     else if (key.tab && !key.shift) {
       setExpanded(prev => {
         const next = new Set(prev);
@@ -85,12 +102,13 @@ export function SessionPreview({
     );
   }
 
-  const visible = messages.slice(windowStart, windowEnd);
+  const windowEnd = Math.min(messages.length, renderWindowStart + fit);
+  const visible = messages.slice(renderWindowStart, windowEnd);
   const showOverflowHint = messages.length > fit;
   const query = committedQuery || (searchOpen ? searchValue : "");
 
   return (
-    <Box flexDirection="column" width={width} height={height}>
+    <Box flexDirection="column" width={width} height={height} overflow="hidden">
       {searchOpen && (
         <SearchBar
           label={<Text color="cyan">🔎</Text>}
@@ -99,9 +117,9 @@ export function SessionPreview({
           onSubmit={(v) => { setCommittedQuery(v); setSearchOpen(false); }}
         />
       )}
-      <Box flexDirection="column" flexGrow={1}>
+      <Box flexDirection="column" flexGrow={1} overflow="hidden">
         {visible.map((m, i) => {
-          const realIdx = windowStart + i;
+          const realIdx = renderWindowStart + i;
           return (
             <MessageBlock
               key={realIdx}
@@ -116,7 +134,7 @@ export function SessionPreview({
       {showOverflowHint && (
         <Box flexShrink={0}>
           <Text dimColor>
-            {windowStart > 0 ? "  ↑ " : "    "}
+            {renderWindowStart > 0 ? "  ↑ " : "    "}
             {safeCursor + 1} / {messages.length}
             {windowEnd < messages.length ? "  ↓" : "   "}
           </Text>
@@ -124,6 +142,15 @@ export function SessionPreview({
       )}
     </Box>
   );
+}
+
+function clampWindow(prev: number, cursor: number, fit: number, total: number): number {
+  if (total <= fit) return 0;
+  let s = prev;
+  if (cursor < s) s = cursor;                       // cursor moved past the top
+  if (cursor >= s + fit) s = cursor - fit + 1;      // cursor moved past the bottom
+  s = Math.max(0, Math.min(s, total - fit));        // keep within valid range
+  return s;
 }
 
 function highlight(m: Message, query: string): Message {
