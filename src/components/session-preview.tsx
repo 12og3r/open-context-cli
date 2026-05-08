@@ -49,6 +49,7 @@ export function SessionPreview({
     setSearchValue("");
     setCommittedQuery("");
     setMatchIndex(-1);
+    lastInitKey.current = null;
   }, [sessionId]);
 
   const lastIdx = Math.max(0, messages.length - 1);
