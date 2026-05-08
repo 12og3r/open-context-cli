@@ -222,6 +222,16 @@ export function SessionPreview({
     goToMatch((Math.max(0, matchIndex) - 1 + matches.length) % matches.length);
   };
 
+  const commitSearch = () => {
+    setSearchOpen(false);
+    setCommittedQuery(searchValue);
+    if (matches.length > 0 && matchIndex >= 0) {
+      const target = matches[matchIndex]!;
+      setCursor(target.msgIndex);
+      setPinToBottom(target.msgIndex === lastIdx);
+    }
+  };
+
   useInput((input, key) => {
     if (!focused) return;
     if (searchOpen) return;
@@ -307,8 +317,8 @@ export function SessionPreview({
         <SearchBar
           value={searchValue}
           onChange={setSearchValue}
-          onSubmit={() => { setCommittedQuery(searchValue); setSearchOpen(false); }}
-          onCancel={() => { setCommittedQuery(searchValue); setSearchOpen(false); }}
+          onSubmit={commitSearch}
+          onCancel={commitSearch}
           onPrev={onPrev}
           onNext={onNext}
           matchIndex={matchIndex}

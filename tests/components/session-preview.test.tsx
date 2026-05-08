@@ -92,4 +92,51 @@ describe("SessionPreview", () => {
     await tick();
     expect(lastFrame() ?? "").toContain("2 / 2");
   });
+
+  test("Enter closes search and sets cursor to current match's message", async () => {
+    const messages = [
+      { role: "assistant", content: "first", timestamp: new Date(0), raw: {} },
+      { role: "assistant", content: "match here", timestamp: new Date(0), raw: {} },
+      { role: "assistant", content: "tail", timestamp: new Date(0), raw: {} },
+    ] as Message[];
+
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="x" focused={true}
+                      height={8} width={40} emoji={false} />
+    );
+    await tick();
+    stdin.write("\x06");          // Ctrl+F
+    await tick();
+    stdin.write("match");
+    await tick();
+    stdin.write("\r");            // Enter
+    await tick();
+    // Search bar is gone; counter not shown
+    expect(lastFrame() ?? "").not.toContain("1 / 1");
+    // Highlight survives — yellow background still in frame
+    expect(lastFrame() ?? "").toContain("\x1b[43m");
+    // Footer's "X / total" shows cursor on msg index 1 (1-based "2 / 3")
+    expect(lastFrame() ?? "").toContain("2 / 3");
+  });
+
+  test("Esc behaves the same as Enter", async () => {
+    const messages = [
+      { role: "assistant", content: "first", timestamp: new Date(0), raw: {} },
+      { role: "assistant", content: "needle", timestamp: new Date(0), raw: {} },
+      { role: "assistant", content: "tail", timestamp: new Date(0), raw: {} },
+    ] as Message[];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="x" focused={true}
+                      height={8} width={40} emoji={false} />
+    );
+    await tick();
+    stdin.write("\x06");
+    await tick();
+    stdin.write("needle");
+    await tick();
+    stdin.write("\x1b");          // Esc
+    await tick();
+    expect(lastFrame() ?? "").toContain("\x1b[43m");
+    expect(lastFrame() ?? "").toContain("2 / 3");
+  });
 });
