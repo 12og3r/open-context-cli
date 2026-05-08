@@ -68,6 +68,7 @@ export function SessionPreview({
       try {
         const result = await renderConversationAsync(
           messages,
+          // matchIndex: -1 is a placeholder until Task 6 wires it to state.
           { width, expanded, emoji, now: new Date(), query, matchIndex: -1 },
           () => cancelled,
         );
