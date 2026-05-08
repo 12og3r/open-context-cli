@@ -26,6 +26,7 @@ function Harness({ onSubmit, onCancel, onPrev, onNext }: {
 describe("MinimalInput", () => {
   test("appends typed characters and renders them", async () => {
     const { stdin, lastFrame } = render(<Harness />);
+    await tick(); // let useInput's useEffect register the handler
     stdin.write("abc");
     await tick();
     expect(lastFrame() ?? "").toContain("abc");
@@ -33,6 +34,7 @@ describe("MinimalInput", () => {
 
   test("Backspace removes the last character", async () => {
     const { stdin, lastFrame } = render(<Harness />);
+    await tick(); // let useInput's useEffect register the handler
     stdin.write("abc");
     await tick();
     stdin.write("\x7f"); // DEL is what most terminals send for backspace
@@ -44,6 +46,7 @@ describe("MinimalInput", () => {
   test("Enter calls onSubmit", async () => {
     let submitted = false;
     const { stdin } = render(<Harness onSubmit={() => { submitted = true; }} />);
+    await tick(); // let useInput's useEffect register the handler
     stdin.write("\r");
     await tick();
     expect(submitted).toBe(true);
@@ -52,6 +55,7 @@ describe("MinimalInput", () => {
   test("Esc calls onCancel", async () => {
     let cancelled = false;
     const { stdin } = render(<Harness onCancel={() => { cancelled = true; }} />);
+    await tick(); // let useInput's useEffect register the handler
     stdin.write("\x1b");
     await tick();
     expect(cancelled).toBe(true);
@@ -60,6 +64,7 @@ describe("MinimalInput", () => {
   test("up arrow and left arrow both call onPrev", async () => {
     let prev = 0;
     const { stdin } = render(<Harness onPrev={() => { prev++; }} />);
+    await tick(); // let useInput's useEffect register the handler
     stdin.write("\x1b[A"); // up
     await tick();
     stdin.write("\x1b[D"); // left
@@ -70,6 +75,7 @@ describe("MinimalInput", () => {
   test("down arrow and right arrow both call onNext", async () => {
     let nxt = 0;
     const { stdin } = render(<Harness onNext={() => { nxt++; }} />);
+    await tick(); // let useInput's useEffect register the handler
     stdin.write("\x1b[B"); // down
     await tick();
     stdin.write("\x1b[C"); // right
