@@ -1,6 +1,7 @@
 import wrapAnsi from "wrap-ansi";
 import type { Message, Role } from "../providers/types.ts";
 import { markdownToAnsi } from "./markdown-ansi.ts";
+import { findMatches, type Match } from "./matches.ts";
 import { relativeTime } from "./relative-time.ts";
 import { truncate } from "./truncate.ts";
 
@@ -178,7 +179,7 @@ const YIELD_EVERY = 64;
  */
 export function renderConversation(messages: Message[], opts: RenderConversationOpts): ConversationBuffer {
   const useCache = !opts.query;
-  const hl = useCache ? messages : applyHighlight(messages, opts.query).messages;
+  const hl = useCache ? messages : applyHighlight(messages, opts.query, -1).messages;
   const lines: string[] = [];
   const startLine: number[] = new Array(hl.length);
   const endLine: number[] = new Array(hl.length);
@@ -212,7 +213,7 @@ export async function renderConversationAsync(
   isCancelled?: () => boolean,
 ): Promise<ConversationBuffer> {
   const useCache = !opts.query;
-  const hl = useCache ? messages : applyHighlight(messages, opts.query).messages;
+  const hl = useCache ? messages : applyHighlight(messages, opts.query, -1).messages;
   const lines: string[] = [];
   const startLine: number[] = new Array(hl.length);
   const endLine: number[] = new Array(hl.length);
@@ -266,18 +267,46 @@ export function applyCursorOverlay(line: string, kind: "header" | "body" | "marg
 
 const INVERSE = "\x1b[7m";
 const INVERSE_OFF = "\x1b[27m";
+const CURRENT_OPEN = "\x1b[43m\x1b[30m";   // yellow bg, black fg
+const CURRENT_CLOSE = "\x1b[49m\x1b[39m";  // default bg, default fg
 
-function applyHighlight(messages: Message[], query: string): { messages: Message[] } {
-  if (!query) return { messages };
-  const re = new RegExp(escapeRegex(query), "gi");
-  return {
-    messages: messages.map(m => ({
-      ...m,
-      content: m.content.replace(re, s => `${INVERSE}${s}${INVERSE_OFF}`),
-    })),
-  };
-}
+export function applyHighlight(
+  messages: Message[],
+  query: string,
+  matchIndex: number,
+): { messages: Message[]; matches: Match[] } {
+  if (!query) return { messages, matches: [] };
+  const matches = findMatches(messages, query);
+  if (matches.length === 0) return { messages, matches };
 
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Group matches by msgIndex for one pass per affected message.
+  const byMsg = new Map<number, Array<{ m: Match; globalIdx: number }>>();
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i]!;
+    let arr = byMsg.get(m.msgIndex);
+    if (!arr) { arr = []; byMsg.set(m.msgIndex, arr); }
+    arr.push({ m, globalIdx: i });
+  }
+
+  const newMessages = messages.map((m, i) => {
+    const list = byMsg.get(i);
+    if (!list) return m;
+    let result = "";
+    let cursor = 0;
+    for (const { m: match, globalIdx } of list) {
+      result += m.content.slice(cursor, match.contentOffset);
+      const isCurrent = globalIdx === matchIndex;
+      const open = isCurrent ? CURRENT_OPEN : INVERSE;
+      const close = isCurrent ? CURRENT_CLOSE : INVERSE_OFF;
+      result +=
+        open +
+        m.content.slice(match.contentOffset, match.contentOffset + match.length) +
+        close;
+      cursor = match.contentOffset + match.length;
+    }
+    result += m.content.slice(cursor);
+    return { ...m, content: result };
+  });
+
+  return { messages: newMessages, matches };
 }
