@@ -105,9 +105,21 @@ export function App({
           });
         }}
         onRequestContinue={(req) => {
-          // Surface up to the host (cli.tsx) and unmount Ink so the launcher
-          // can take over the terminal cleanly.
           trace("app", `onRequestContinue mode=${req.launchMode} role=${req.targetRole}`);
+          if (req.launchMode === "new-window") {
+            // The new window is a separate process — there's no reason to
+            // also tear down this CLI. Fire the launch async so the preview
+            // can dismiss its footer and the user lands back on the browser,
+            // matching what Esc does on the same row.
+            void (async () => {
+              const { executeContinue } = await import("./lib/continue-launch.ts");
+              const result = await executeContinue(req);
+              trace("app", `new-window executeContinue returned ok=${result.ok}`);
+            })();
+            return;
+          }
+          // reuse-current: hand off to cli.tsx and unmount Ink so the
+          // launcher can take over the terminal cleanly.
           onRequestContinue?.(req);
           trace("app", "calling exit()");
           exit();
