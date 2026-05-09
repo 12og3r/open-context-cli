@@ -6,7 +6,6 @@ import { useLang } from "../hooks/use-lang.ts";
 export type FooterContext =
   | "list"
   | "preview"
-  | "list-search"
   | "preview-search"
   | "path-input"
   | "feature-bar"

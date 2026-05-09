@@ -10,7 +10,6 @@ import type { ContinueRequest } from "../lib/continue-types.ts";
 import { decodeProjectPath } from "../lib/decode-project-path.ts";
 import { SessionList } from "./session-list.tsx";
 import { SessionPreview } from "./session-preview.tsx";
-import { SearchBar } from "./search-bar.tsx";
 import { Footer, type FooterContext } from "./footer.tsx";
 import { FeatureBar, type FeatureItem } from "./feature-bar.tsx";
 import { SettingsPanel, applyDisplayMode } from "./settings-panel.tsx";
@@ -66,9 +65,6 @@ export function SessionBrowser({
 
   const [focus, setFocus] = useState<Focus>("list");
   const [rightView, setRightView] = useState<RightView>("preview");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [filter, setFilter] = useState("");
-  const [committedFilter, setCommittedFilter] = useState("");
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [featureIdx, setFeatureIdx] = useState(0);
   // Mirrored from SessionPreview's continueOpen state. When true, Esc/h/← in
@@ -84,16 +80,7 @@ export function SessionBrowser({
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    if (!committedFilter) return sessions;
-    const q = committedFilter.toLowerCase();
-    return sessions.filter(s =>
-      s.summary.toLowerCase().includes(q) ||
-      s.projectPath.toLowerCase().includes(q),
-    );
-  }, [sessions, committedFilter]);
-
-  const selected = filtered[Math.min(selectedIdx, filtered.length - 1)] ?? null;
+  const selected = sessions[Math.min(selectedIdx, sessions.length - 1)] ?? null;
   const detail = useSessionDetail(provider, selected);
 
   // Apply the user's display-mode preference at this layer so the preview's
@@ -106,19 +93,17 @@ export function SessionBrowser({
   }, [detail, settings.displayMode]);
 
   useInput((input, key) => {
-    if (searchOpen) return;
     if (input === "q" || (key.ctrl && input === "c")) { onQuit(); return; }
 
     if (focus === "list") {
       if (input === "p") { onRequestPathInput(); return; }
       if (key.tab) { setFocus("feature-bar"); return; }
-      if (input === "j" || key.downArrow) setSelectedIdx(i => Math.min(filtered.length - 1, i + 1));
+      if (input === "j" || key.downArrow) setSelectedIdx(i => Math.min(sessions.length - 1, i + 1));
       else if (input === "k" || key.upArrow) setSelectedIdx(i => Math.max(0, i - 1));
       else if (key.return || input === "l" || key.rightArrow) {
         if (rightView !== "preview") setRightView("preview");
         setFocus("preview");
       }
-      else if (input === "/") setSearchOpen(true);
       return;
     }
 
@@ -211,9 +196,9 @@ export function SessionBrowser({
     }
     // Selection follows the same index — sessions shift up by one on removal,
     // so the next session naturally takes the slot. Clamp at the new end.
-    const removingFiltered = filtered.findIndex(s => s.id === target.id);
-    if (removingFiltered >= 0) {
-      const newLen = filtered.length - 1;
+    const removingIdx = sessions.findIndex(s => s.id === target.id);
+    if (removingIdx >= 0) {
+      const newLen = sessions.length - 1;
       setSelectedIdx(prev => Math.min(prev, Math.max(0, newLen - 1)));
     }
     onSessionRemoved?.(target.id);
@@ -223,9 +208,8 @@ export function SessionBrowser({
     setFocus("list");
   }
 
-  const footerContext: FooterContext = searchOpen
-    ? "list-search"
-    : focus === "settings"
+  const footerContext: FooterContext =
+    focus === "settings"
       ? "settings"
       : focus === "delete-confirm"
         ? "delete-confirm"
@@ -245,7 +229,7 @@ export function SessionBrowser({
   // the pane so empty rows stack above it rather than below — that's what makes
   // the bottom region read as a discrete panel without feeling tall.
   const featureBarHeight = 2;
-  const listHeight = Math.max(1, innerHeight - featureBarHeight - (searchOpen ? 1 : 0));
+  const listHeight = Math.max(1, innerHeight - featureBarHeight);
 
   return (
     <Box flexDirection="column" width={termWidth} height={termHeight}>
@@ -254,29 +238,17 @@ export function SessionBrowser({
           width={leftWidth}
           focused={listFocused || focus === "feature-bar"}
           accent={listFocused ? ACCENT : focus === "feature-bar" ? ACCENT : MUTED}
-          title={searchOpen ? t(lang, "title.filter") : t(lang, "title.sessions")}
-          meta={searchOpen ? "" : `${filtered.length}`}
+          title={t(lang, "title.sessions")}
+          meta={`${sessions.length}`}
         >
-          {searchOpen ? (
-            <SearchBar
-              value={filter}
-              onChange={setFilter}
-              onSubmit={() => { setCommittedFilter(filter); setSearchOpen(false); setSelectedIdx(0); }}
-              onCancel={() => { setCommittedFilter(filter); setSearchOpen(false); }}
-              onPrev={() => {}}
-              onNext={() => {}}
-              matchIndex={-1}
-              matchCount={-1}
-            />
-          ) : null}
           <Box flexDirection="column" flexGrow={1} flexShrink={1}>
             <SessionList
-              sessions={filtered}
+              sessions={sessions}
               selectedId={selected?.id ?? null}
               width={leftInnerWidth}
               height={listHeight}
             />
-            {filtered.length === 0 && !searchOpen && (
+            {sessions.length === 0 && (
               <Text dimColor>{t(lang, "empty.sessions")}</Text>
             )}
           </Box>

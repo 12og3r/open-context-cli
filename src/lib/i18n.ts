@@ -15,7 +15,6 @@ type StringTable = Record<string, string>;
 const en: StringTable = {
   // Pane titles
   "title.sessions": "SESSIONS",
-  "title.filter": "FILTER",
   "title.preview": "PREVIEW",
   "title.settings": "SETTINGS",
   "title.delete": "DELETE",
@@ -113,9 +112,8 @@ const en: StringTable = {
   // Footer hints — pipe-joined strings; one segment per token. Splitting at
   // render time avoids Record<FooterContext,string[]> here, which would force
   // i18n.ts to import a UI type and create a circular dependency.
-  "footer.list":           "↑↓ select|⏎ focus preview|/ search|⇥ menu|p path|q quit",
+  "footer.list":           "↑↓ select|⏎ focus preview|⇥ menu|p path|q quit",
   "footer.preview":        "↑↓ scroll|esc back|⌃F find|⇥ expand tool|⏎ continue|q quit",
-  "footer.list-search":    "type to filter|⏎ apply|esc cancel",
   "footer.preview-search": "type to search|⏎ commit|esc cancel",
   "footer.path-input":     "type a path|⏎ submit|esc quit",
   "footer.feature-bar":    "←→ pick|⇥ next|⏎ open|esc back",
@@ -125,7 +123,6 @@ const en: StringTable = {
 
 const zh: StringTable = {
   "title.sessions": "会话",
-  "title.filter": "筛选",
   "title.preview": "预览",
   "title.settings": "设置",
   "title.delete": "删除",
@@ -208,9 +205,8 @@ const zh: StringTable = {
   "rt.hours_ago": "{n} 小时前",
   "rt.days_ago": "{n} 天前",
 
-  "footer.list":           "↑↓ 选择|⏎ 进入预览|/ 搜索|⇥ 菜单|p 路径|q 退出",
+  "footer.list":           "↑↓ 选择|⏎ 进入预览|⇥ 菜单|p 路径|q 退出",
   "footer.preview":        "↑↓ 滚动|esc 返回|⌃F 查找|⇥ 展开工具|⏎ 继续对话|q 退出",
-  "footer.list-search":    "输入以筛选|⏎ 应用|esc 取消",
   "footer.preview-search": "输入以搜索|⏎ 确认|esc 取消",
   "footer.path-input":     "输入路径|⏎ 提交|esc 退出",
   "footer.feature-bar":    "←→ 选择|⇥ 下一项|⏎ 打开|esc 返回",
