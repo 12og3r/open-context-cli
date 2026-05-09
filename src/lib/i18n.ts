@@ -63,6 +63,8 @@ const en: StringTable = {
 
   // Continue conversation
   "continue.footer_label": "↪ Continue conversation",
+  "continue.footer_label_force": "↪ Continue conversation (force)",
+  "continue.force_hint": "project dir missing — Enter again to launch in {cwd}",
   "continue.error_no_claude": "claude not found in PATH",
   "continue.error_not_tty": "current stdout is not a TTY",
   "continue.error_unsupported": "\"new window\" mode is not supported on this platform",
@@ -166,6 +168,8 @@ const zh: StringTable = {
   "settings.launch_mode.unsupported_note": "仅 macOS 支持",
 
   "continue.footer_label": "↪ 继续对话",
+  "continue.footer_label_force": "↪ 继续对话（强制）",
+  "continue.force_hint": "项目目录已不存在 —— 再按一次 Enter 在 {cwd} 启动",
   "continue.error_no_claude": "在 PATH 中未找到 claude 命令",
   "continue.error_not_tty": "当前 stdout 不是 TTY",
   "continue.error_unsupported": "当前平台不支持「弹出新终端窗口」",

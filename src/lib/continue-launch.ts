@@ -38,7 +38,7 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
   const newUuid = randomUUID();
   const dir = path.dirname(req.sourcePath);
   const dstPath = path.join(dir, `${newUuid}.jsonl`);
-  trace("launch", `fork → ${dstPath}`);
+  trace("launch", `fork → ${dstPath}${req.forceCwd ? ` (force cwd=${req.forceCwd})` : ""}`);
 
   try {
     await forkSession({
@@ -47,6 +47,7 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
       targetUuid: req.targetUuid,
       targetRole: req.targetRole,
       newSessionId: newUuid,
+      newCwd: req.forceCwd,
     });
   } catch (e) {
     trace("launch", `fork FAIL: ${(e as Error).message}`);
@@ -54,7 +55,9 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
   }
   trace("launch", "fork ok");
 
-  const cwd = await detectProjectCwd(req.sourcePath);
+  // forceCwd skips detection: the user has explicitly chosen the launch dir
+  // because the original is missing.
+  const cwd = req.forceCwd ?? (await detectProjectCwd(req.sourcePath));
   trace("launch", `cwd=${cwd}`);
 
   if (req.launchMode === "reuse-current") {

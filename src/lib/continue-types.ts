@@ -11,4 +11,9 @@ export interface ContinueRequest {
   userText?: string;
   // Resolved at request time so cli.tsx doesn't need to re-read settings.
   launchMode: ContinueLaunchMode;
+  // Force mode: when set, the original project directory was missing and
+  // the user asked to launch in this cwd instead. The launcher uses this
+  // path as both the spawn cwd and as the value rewritten into every
+  // copied JSONL entry's `cwd` field.
+  forceCwd?: string;
 }

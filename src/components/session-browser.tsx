@@ -347,19 +347,30 @@ export function SessionBrowser({
                     if (!selected || !onRequestContinue) return { ok: true };
 
                     // Pre-flight checks done while Ink is still up so we can
-                    // surface failures as a red line under the footer instead
-                    // of crashing out to a stderr message after unmount.
+                    // surface failures as a hint under the footer instead of
+                    // crashing out to stderr after unmount.
                     if (!fsSync.existsSync(selected.filePath)) {
                       return { ok: false, error: t(lang, "continue.error_source_missing") };
                     }
+
+                    // Project directory missing: recoverable. First confirm
+                    // returns recoverable=force-cwd so preview can offer
+                    // (force); the next confirm arrives with info.force=true
+                    // and we launch in process.cwd() instead.
+                    let forceCwd: string | undefined;
                     const slug = path.basename(path.dirname(selected.filePath));
                     const decodedCwd = decodeProjectPath(slug);
                     if (decodedCwd && !fsSync.existsSync(decodedCwd)) {
-                      return {
-                        ok: false,
-                        error: t(lang, "continue.error_cwd_missing", { cwd: decodedCwd }),
-                      };
+                      if (!info.force) {
+                        return {
+                          ok: false,
+                          error: t(lang, "continue.force_hint", { cwd: process.cwd() }),
+                          recoverable: "force-cwd",
+                        };
+                      }
+                      forceCwd = process.cwd();
                     }
+
                     const claudeProbe = spawnSync(
                       process.platform === "win32" ? "where" : "which",
                       ["claude"],
@@ -375,6 +386,7 @@ export function SessionBrowser({
                       targetRole: info.targetRole,
                       userText: info.userText,
                       launchMode: settings.continueLaunchMode,
+                      forceCwd,
                     });
                     return { ok: true };
                   }}

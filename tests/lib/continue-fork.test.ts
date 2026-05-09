@@ -46,4 +46,40 @@ describe("forkSession", () => {
       forkSession({ srcPath: src, dstPath: dst, targetUuid: "missing", targetRole: "user", newSessionId: "NEW" }),
     ).rejects.toThrow();
   });
+
+  test("newCwd rewrites cwd field on every copied entry", async () => {
+    const src = await tmpFile();
+    const dst = await tmpFile();
+    const withCwd = [
+      JSON.stringify({ type: "user",      uuid: "u1", sessionId: "S0", cwd: "/old/path", message: { content: "hi" }, timestamp: "t" }),
+      JSON.stringify({ type: "assistant", uuid: "a1", sessionId: "S0", cwd: "/old/path", message: { content: "hi back" }, timestamp: "t" }),
+      JSON.stringify({ type: "user",      uuid: "u2", sessionId: "S0", cwd: "/old/path", message: { content: "next" }, timestamp: "t" }),
+    ].join("\n") + "\n";
+    await fs.writeFile(src, withCwd);
+    await forkSession({
+      srcPath: src,
+      dstPath: dst,
+      targetUuid: "u2",
+      targetRole: "user",
+      newSessionId: "NEW",
+      newCwd: "/new/place",
+    });
+    const out = (await fs.readFile(dst, "utf8")).trim().split("\n").map(l => JSON.parse(l));
+    expect(out.map(e => e.uuid)).toEqual(["u1", "a1"]);
+    expect(out.every(e => e.cwd === "/new/place")).toBe(true);
+    expect(out.every(e => e.sessionId === "NEW")).toBe(true);
+  });
+
+  test("without newCwd, original cwd is preserved", async () => {
+    const src = await tmpFile();
+    const dst = await tmpFile();
+    const withCwd = [
+      JSON.stringify({ type: "user", uuid: "u1", sessionId: "S0", cwd: "/keep", message: { content: "hi" }, timestamp: "t" }),
+      JSON.stringify({ type: "user", uuid: "u2", sessionId: "S0", cwd: "/keep", message: { content: "x" }, timestamp: "t" }),
+    ].join("\n") + "\n";
+    await fs.writeFile(src, withCwd);
+    await forkSession({ srcPath: src, dstPath: dst, targetUuid: "u2", targetRole: "user", newSessionId: "NEW" });
+    const out = (await fs.readFile(dst, "utf8")).trim().split("\n").map(l => JSON.parse(l));
+    expect(out[0].cwd).toBe("/keep");
+  });
 });

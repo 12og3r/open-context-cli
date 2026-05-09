@@ -36,11 +36,17 @@ export function SessionPreview({
   // Returns { ok: true } when validation passed and the launch was kicked off,
   // or { ok: false, error } when a pre-flight check failed. Preview shows the
   // error in red below the confirm footer; user dismisses with Esc.
+  //
+  // The `force-cwd` recoverable variant means the project directory is gone
+  // but launching in a fallback cwd is still possible. Preview switches the
+  // footer label to "(force)" and shows the message in yellow as a hint;
+  // pressing Enter again calls back with `force: true` to actually launch.
   onRequestContinue?: (info: {
     targetUuid: string;
     targetRole: "user" | "assistant";
     userText?: string;
-  }) => { ok: true } | { ok: false; error: string };
+    force?: boolean;
+  }) => { ok: true } | { ok: false; error: string; recoverable?: "force-cwd" };
 }) {
   const lang = useLang();
   // pinToBottom: while true, the viewport sticks to the latest message and the
@@ -58,9 +64,12 @@ export function SessionPreview({
   // Esc cancels.
   const [continueOpen, setContinueOpen] = useState(false);
   // continueError: set when a pre-launch check (source file missing, project
-  // dir missing, claude not on PATH) reports failure. Shown red beneath the
-  // footer; cleared on Esc.
+  // dir missing, claude not on PATH) reports failure. Shown red (or yellow
+  // when forceMode) beneath the footer; cleared on Esc.
   const [continueError, setContinueError] = useState<string | null>(null);
+  // forceMode: enters when the parent reports `recoverable: "force-cwd"`.
+  // The next confirm passes `force: true`. Cleared on Esc.
+  const [forceMode, setForceMode] = useState(false);
 
   // Track the query|messages.length pair for which we last placed the initial
   // matchIndex. Using a ref avoids adding matchIndex to the dep array (which
@@ -86,6 +95,7 @@ export function SessionPreview({
     setMatchIndex(-1);
     setContinueOpen(false);
     setContinueError(null);
+    setForceMode(false);
     lastInitKey.current = null;
     lastAnchorRef.current = null;
     // Wipe the buffer so the spinner shows for the new session, instead of
@@ -329,25 +339,29 @@ export function SessionPreview({
     // Continue-conversation footer mode: suppress all preview navigation;
     // Enter confirms (calls back), Esc cancels.
     if (continueOpen) {
-      trace("preview", `continueOpen handler key.return=${!!key.return} key.escape=${!!key.escape}`);
+      trace("preview", `continueOpen handler key.return=${!!key.return} key.escape=${!!key.escape} forceMode=${forceMode}`);
       if (key.return) {
         const target = pinToBottom ? lastIdx : effectiveCursor;
         const msg = messages[target];
         trace("preview", `confirm target=${target} role=${msg?.role} uuid=${msg?.uuid?.slice(0, 8) ?? "(none)"}`);
         if (msg && (msg.role === "user" || msg.role === "assistant") && typeof msg.uuid === "string") {
-          trace("preview", "calling onRequestContinue");
+          trace("preview", `calling onRequestContinue force=${forceMode}`);
           const result = onRequestContinue?.({
             targetUuid: msg.uuid,
             targetRole: msg.role,
             userText: msg.role === "user" ? msg.content : undefined,
+            force: forceMode,
           });
-          trace("preview", `onRequestContinue returned ok=${result?.ok ?? "undef"}`);
+          trace("preview", `onRequestContinue returned ok=${result?.ok ?? "undef"} recoverable=${result && !result.ok ? result.recoverable ?? "(none)" : "n/a"}`);
           if (result && !result.ok) {
-            // Stay in continueOpen; render the error red beneath the label.
             setContinueError(result.error);
+            // Recoverable failures keep the footer up and switch to (force)
+            // mode so the next Enter triggers a forced launch.
+            setForceMode(result.recoverable === "force-cwd");
             return;
           }
           setContinueError(null);
+          setForceMode(false);
         } else {
           trace("preview", `gate failed: msg=${!!msg} uuidIsString=${typeof msg?.uuid === "string"}`);
         }
@@ -355,6 +369,7 @@ export function SessionPreview({
       } else if (key.escape) {
         setContinueOpen(false);
         setContinueError(null);
+        setForceMode(false);
       }
       return;
     }
@@ -501,10 +516,12 @@ export function SessionPreview({
         <Box flexDirection="column" flexShrink={0}>
           <Text dimColor>{"─".repeat(width)}</Text>
           <Text wrap="truncate" color="cyan" bold>
-            {t(lang, "continue.footer_label")}
+            {t(lang, forceMode ? "continue.footer_label_force" : "continue.footer_label")}
           </Text>
           {continueError && (
-            <Text wrap="truncate" color="red">{continueError}</Text>
+            <Text wrap="truncate" color={forceMode ? "yellow" : "red"}>
+              {continueError}
+            </Text>
           )}
         </Box>
       )}

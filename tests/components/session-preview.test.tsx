@@ -433,6 +433,39 @@ describe("SessionPreview", () => {
     });
   });
 
+  test("recoverable cwd-missing error switches label to (force); next Enter retries with force=true", async () => {
+    type Info = { targetUuid: string; targetRole: "user" | "assistant"; userText?: string; force?: boolean };
+    type Result = { ok: true } | { ok: false; error: string; recoverable?: "force-cwd" };
+    const onRequest = mock((info: Info): Result => {
+      if (!info.force) {
+        return { ok: false, error: "project dir missing — Enter again to launch in /tmp/now", recoverable: "force-cwd" };
+      }
+      return { ok: true };
+    });
+    const messages: Message[] = [
+      { role: "user", content: "hi", timestamp: new Date(0), uuid: "u1", raw: {} },
+    ];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="s" focused={true} height={10} width={70} emoji={false} onRequestContinue={onRequest} />
+    );
+    await tick();
+    stdin.write("\r");                  // open footer
+    await tick();
+    expect(lastFrame() ?? "").toContain("Continue conversation");
+    stdin.write("\r");                  // first confirm — recoverable failure
+    await tick();
+    const out1 = lastFrame() ?? "";
+    expect(out1).toContain("(force)");                     // label switched
+    expect(out1).toContain("project dir missing");          // hint visible
+    expect(onRequest).toHaveBeenCalledTimes(1);
+    expect(onRequest.mock.calls[0]?.[0]?.force).toBeFalsy();
+    stdin.write("\r");                  // second confirm — with force
+    await tick();
+    expect(onRequest).toHaveBeenCalledTimes(2);
+    expect(onRequest.mock.calls[1]?.[0]?.force).toBe(true);
+    expect(lastFrame() ?? "").not.toContain("Continue conversation");
+  });
+
   test("validation error keeps the footer open and shows the message in red", async () => {
     const onRequest = mock(
       (_info: { targetUuid: string; targetRole: "user" | "assistant"; userText?: string }) =>
