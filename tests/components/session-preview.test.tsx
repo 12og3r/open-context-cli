@@ -514,4 +514,34 @@ describe("SessionPreview", () => {
     expect(lastFrame() ?? "").not.toContain("Continue conversation");
     expect(onRequest).not.toHaveBeenCalled();
   });
+
+  test("onContinueOpenChange fires true on Enter and false on Esc", async () => {
+    // The parent (SessionBrowser) uses this signal to suppress its own Esc
+    // handling while the footer is up; without the false-on-Esc pulse the
+    // parent would unfocus the preview and the cursor highlight would vanish.
+    const onContinueOpenChange = mock((_open: boolean) => {});
+    const messages: Message[] = [
+      { role: "user", content: "hi", timestamp: new Date(0), uuid: "u1", raw: {} },
+    ];
+    const { stdin } = render(
+      <SessionPreview
+        messages={messages}
+        sessionId="s"
+        focused={true}
+        height={6}
+        width={40}
+        emoji={false}
+        onContinueOpenChange={onContinueOpenChange}
+      />
+    );
+    await tick();
+    // Initial mount commits a `false` baseline — that's expected.
+    onContinueOpenChange.mockClear();
+    stdin.write("\r");
+    await tick();
+    expect(onContinueOpenChange).toHaveBeenLastCalledWith(true);
+    stdin.write("\x1b");
+    await tick();
+    expect(onContinueOpenChange).toHaveBeenLastCalledWith(false);
+  });
 });

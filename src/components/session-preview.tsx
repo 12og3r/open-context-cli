@@ -25,6 +25,7 @@ export function SessionPreview({
   emoji = true,
   showHash = false,
   onRequestContinue,
+  onContinueOpenChange,
 }: {
   messages: Message[];
   sessionId: string | null;
@@ -47,6 +48,10 @@ export function SessionPreview({
     userText?: string;
     force?: boolean;
   }) => { ok: true } | { ok: false; error: string; recoverable?: "force-cwd" };
+  // Notifies the parent whenever the continue footer opens or closes. The
+  // parent uses it to gate its own Esc handling so dismissing the footer
+  // doesn't also unfocus the preview (which would hide the cursor).
+  onContinueOpenChange?: (open: boolean) => void;
 }) {
   const lang = useLang();
   // pinToBottom: while true, the viewport sticks to the latest message and the
@@ -70,6 +75,13 @@ export function SessionPreview({
   // forceMode: enters when the parent reports `recoverable: "force-cwd"`.
   // The next confirm passes `force: true`. Cleared on Esc.
   const [forceMode, setForceMode] = useState(false);
+
+  // Mirror the open/closed state up so the parent can suppress its own Esc
+  // handler while the footer is up — otherwise dismissing the footer would
+  // also unfocus the preview, taking the cursor highlight with it.
+  useEffect(() => {
+    onContinueOpenChange?.(continueOpen);
+  }, [continueOpen, onContinueOpenChange]);
 
   // Track the query|messages.length pair for which we last placed the initial
   // matchIndex. Using a ref avoids adding matchIndex to the dep array (which

@@ -71,6 +71,10 @@ export function SessionBrowser({
   const [committedFilter, setCommittedFilter] = useState("");
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [featureIdx, setFeatureIdx] = useState(0);
+  // Mirrored from SessionPreview's continueOpen state. When true, Esc/h/← in
+  // preview focus must be left to the preview itself — otherwise we'd race the
+  // preview's own dismiss and unfocus it, stripping the cursor highlight.
+  const [previewContinueOpen, setPreviewContinueOpen] = useState(false);
 
   // Delete-confirm dialog state. `target` is the session pinned at the moment
   // the user opened the dialog; we hold it locally so the visible "Delete this
@@ -119,6 +123,10 @@ export function SessionBrowser({
     }
 
     if (focus === "preview") {
+      // While the continue footer is up, the preview owns Esc — it dismisses
+      // the footer in place and keeps the cursor visible. Stealing it here
+      // would also drop focus back to the list.
+      if (previewContinueOpen) return;
       if (key.escape || input === "h" || key.leftArrow) setFocus("list");
       return;
     }
@@ -343,6 +351,7 @@ export function SessionBrowser({
                   width={rightInnerWidth}
                   emoji={emoji}
                   showHash={settings.showHash}
+                  onContinueOpenChange={setPreviewContinueOpen}
                   onRequestContinue={(info) => {
                     if (!selected || !onRequestContinue) return { ok: true };
 
