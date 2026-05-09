@@ -33,26 +33,6 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
   });
   debug(`spawned pid=${child.pid}`);
 
-  // Sanity probes: verify stdout is still writable after Ink unmount, and
-  // that we can poll the child's liveness. Both go to stderr trace, not to
-  // process.stdout where they'd corrupt claude's UI.
-  try {
-    process.stdout.write("");
-    debug("stdout.write probe ok");
-  } catch (e) {
-    debug(`stdout.write probe FAIL: ${(e as Error).message}`);
-  }
-  setTimeout(() => {
-    if (child.pid) {
-      try {
-        process.kill(child.pid, 0);
-        debug(`child still alive at +500ms (pid=${child.pid})`);
-      } catch {
-        debug(`child not alive at +500ms (pid=${child.pid})`);
-      }
-    }
-  }, 500);
-
   let injected = false;
   const inject = (reason: string) => {
     if (injected || !spec.prefillText) return;
@@ -82,7 +62,6 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
   let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
   let chunkCount = 0;
 
-  let pasteModeSeen = false;
   const onData = child.onData((data) => {
     chunkCount += 1;
     if (firstChunkAt === 0) {
@@ -92,15 +71,10 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
         deadlineTimer = setTimeout(() => inject("hard deadline"), HARD_DEADLINE_MS);
       }
     }
-    if (!pasteModeSeen && data.includes("\x1b[?2004h")) {
-      pasteModeSeen = true;
-      debug(`paste-mode-enable observed at chunk #${chunkCount} (${Date.now() - firstChunkAt}ms)`);
-    }
     if (altScreenAt === 0 && data.includes("\x1b[?1049h")) {
       altScreenAt = Date.now();
-      debug(`alt-screen-enter observed at chunk #${chunkCount} (${altScreenAt - firstChunkAt}ms)`);
+      debug(`alt-screen-enter at chunk #${chunkCount} (${altScreenAt - firstChunkAt}ms)`);
     }
-    if (chunkCount <= 10) debug(`chunk #${chunkCount} ${data.length}b head=${JSON.stringify(data.slice(0, 200))}`);
     process.stdout.write(data);
 
     if (spec.prefillText && !injected && altScreenAt !== 0) {
@@ -116,7 +90,6 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
   process.stdin.setEncoding?.("utf8");
   process.stdin.resume();
   const onStdin = (chunk: string | Buffer) => {
-    debug(`stdin ${chunk.length}b`);
     child.write(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
   };
   process.stdin.on("data", onStdin);
