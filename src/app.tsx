@@ -7,7 +7,6 @@ import os from "node:os";
 import fs from "node:fs/promises";
 import { getProvider } from "./providers/index.ts";
 import type { SessionMeta } from "./providers/types.ts";
-import { PathInput } from "./components/path-input.tsx";
 import { SessionBrowser } from "./components/session-browser.tsx";
 import { LangProvider } from "./hooks/use-lang.ts";
 import { useSettings } from "./hooks/use-settings.ts";
@@ -15,10 +14,16 @@ import { t } from "./lib/i18n.ts";
 import type { ContinueRequest } from "./lib/continue-types.ts";
 import { trace } from "./lib/debug-trace.ts";
 
+export type SessionStatus = "ok" | "missing";
+
 type AppState =
   | { kind: "scanning"; root: string }
-  | { kind: "path-input"; reason: "no-default-path" | "user-requested"; error?: string }
-  | { kind: "browser"; root: string; sessions: SessionMeta[] };
+  | {
+      kind: "browser";
+      root: string;
+      sessions: SessionMeta[];
+      sessionStatus: SessionStatus;
+    };
 
 export function App({
   initialPath,
@@ -33,10 +38,31 @@ export function App({
   const { exit } = useApp();
   const { settings, update: updateSetting } = useSettings();
   const lang = settings.language;
+
+  // Resolution order: explicit CLI flag > saved setting > provider default.
+  // The saved setting is treated as a soft preference — empty string means
+  // "fall back to default", and any non-empty value is taken at face value
+  // (validation is the scanner's job, not ours).
+  const effectiveRoot = useMemo(() => {
+    const raw = initialPath || settings.sessionsDir || provider.defaultPaths[0]!;
+    return expandHome(raw);
+  }, [initialPath, settings.sessionsDir, provider]);
+
   const [state, setState] = useState<AppState>(() => {
-    const root = initialPath ?? provider.defaultPaths[0]!;
-    return { kind: "scanning", root: expandHome(root) };
+    return { kind: "scanning", root: effectiveRoot };
   });
+
+  // Re-scan when the resolved root changes (e.g. user edits sessionsDir in
+  // the settings panel). We only restart if it's actually a different root —
+  // settings load asynchronously, so the same path arriving twice during
+  // hydration shouldn't tear down a freshly-loaded list.
+  useEffect(() => {
+    setState(prev => {
+      if (prev.kind === "scanning" && prev.root === effectiveRoot) return prev;
+      if (prev.kind === "browser" && prev.root === effectiveRoot) return prev;
+      return { kind: "scanning", root: effectiveRoot };
+    });
+  }, [effectiveRoot]);
 
   useEffect(() => {
     if (state.kind !== "scanning") return;
@@ -46,20 +72,21 @@ export function App({
       const ok = await directoryHasJsonl(root);
       if (cancelled) return;
       if (!ok) {
-        setState({ kind: "path-input", reason: "no-default-path" });
+        setState({ kind: "browser", root, sessions: [], sessionStatus: "missing" });
         return;
       }
       try {
         const sessions = await provider.listSessions(root);
         if (cancelled) return;
-        if (sessions.length === 0) {
-          setState({ kind: "path-input", reason: "no-default-path" });
-        } else {
-          setState({ kind: "browser", root, sessions });
-        }
-      } catch (e) {
+        setState({
+          kind: "browser",
+          root,
+          sessions,
+          sessionStatus: sessions.length === 0 ? "missing" : "ok",
+        });
+      } catch {
         if (cancelled) return;
-        setState({ kind: "path-input", reason: "no-default-path", error: (e as Error).message });
+        setState({ kind: "browser", root, sessions: [], sessionStatus: "missing" });
       }
     })();
     return () => { cancelled = true; };
@@ -74,34 +101,25 @@ export function App({
       </LangProvider>
     );
   }
-  if (state.kind === "path-input") {
-    return (
-      <LangProvider value={lang}>
-        <PathInput
-          reason={state.reason}
-          error={state.error}
-          onSubmit={(p) => {
-            const root = expandHome(p);
-            setState({ kind: "scanning", root });
-          }}
-        />
-      </LangProvider>
-    );
-  }
   return (
     <LangProvider value={lang}>
       <SessionBrowser
         provider={provider}
         sessions={state.sessions}
+        sessionStatus={state.sessionStatus}
         emoji={emoji}
         settings={settings}
         updateSetting={updateSetting}
-        onRequestPathInput={() => setState({ kind: "path-input", reason: "user-requested" })}
         onQuit={() => exit()}
         onSessionRemoved={(id) => {
           setState(prev => {
             if (prev.kind !== "browser") return prev;
-            return { ...prev, sessions: prev.sessions.filter(s => s.id !== id) };
+            const next = prev.sessions.filter(s => s.id !== id);
+            return {
+              ...prev,
+              sessions: next,
+              sessionStatus: next.length === 0 ? "missing" : "ok",
+            };
           });
         }}
         onRequestContinue={(req) => {

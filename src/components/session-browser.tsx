@@ -7,6 +7,7 @@ import { Box, Text, useInput, useStdout } from "ink";
 import Spinner from "ink-spinner";
 import type { SessionMeta, SessionProvider } from "../providers/types.ts";
 import type { ContinueRequest } from "../lib/continue-types.ts";
+import type { SessionStatus } from "../app.tsx";
 import { decodeProjectPath } from "../lib/decode-project-path.ts";
 import { SessionList } from "./session-list.tsx";
 import { SessionPreview } from "./session-preview.tsx";
@@ -29,20 +30,20 @@ type RightView = "preview" | "settings" | "delete-confirm";
 export function SessionBrowser({
   provider,
   sessions,
+  sessionStatus,
   emoji,
   settings,
   updateSetting,
-  onRequestPathInput,
   onQuit,
   onSessionRemoved,
   onRequestContinue,
 }: {
   provider: SessionProvider;
   sessions: SessionMeta[];
+  sessionStatus: SessionStatus;
   emoji: boolean;
   settings: Settings;
   updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
-  onRequestPathInput: () => void;
   onQuit: () => void;
   onSessionRemoved?: (id: string) => void;
   onRequestContinue?: (req: ContinueRequest) => void;
@@ -63,8 +64,14 @@ export function SessionBrowser({
   const rightWidth = termWidth - leftWidth;
   const contentHeight = termHeight - 2; // footer + 1 spacing line
 
-  const [focus, setFocus] = useState<Focus>("list");
-  const [rightView, setRightView] = useState<RightView>("preview");
+  // When sessions can't be found, route the user straight to the settings
+  // panel so they can fix the path. Otherwise start on the list as usual.
+  const [focus, setFocus] = useState<Focus>(
+    sessionStatus === "missing" ? "settings" : "list",
+  );
+  const [rightView, setRightView] = useState<RightView>(
+    sessionStatus === "missing" ? "settings" : "preview",
+  );
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [featureIdx, setFeatureIdx] = useState(0);
   // Mirrored from SessionPreview's continueOpen state. When true, Esc/h/← in
@@ -96,7 +103,6 @@ export function SessionBrowser({
     if (input === "q" || (key.ctrl && input === "c")) { onQuit(); return; }
 
     if (focus === "list") {
-      if (input === "p") { onRequestPathInput(); return; }
       if (key.tab) { setFocus("feature-bar"); return; }
       if (input === "j" || key.downArrow) setSelectedIdx(i => Math.min(sessions.length - 1, i + 1));
       else if (input === "k" || key.upArrow) setSelectedIdx(i => Math.max(0, i - 1));
@@ -293,6 +299,8 @@ export function SessionBrowser({
               focused={focus === "settings"}
               width={rightInnerWidth}
               height={innerHeight}
+              defaultSessionsDir={provider.defaultPaths[0] ?? ""}
+              sessionStatus={sessionStatus}
             />
           ) : rightView === "delete-confirm" && deleteTarget ? (
             <DeleteConfirm

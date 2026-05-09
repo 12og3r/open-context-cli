@@ -10,12 +10,6 @@ describe("t", () => {
     expect(t("zh", "title.sessions")).toBe("会话");
   });
 
-  test("falls back to English when a Chinese key is missing", () => {
-    // Brand string is intentionally identical across languages — guard against
-    // accidentally translating the wordmark in the future.
-    expect(t("zh", "path.brand")).toBe("open-context");
-  });
-
   test("returns the key itself for an unknown id", () => {
     expect(t("en", "this.does.not.exist")).toBe("this.does.not.exist");
   });

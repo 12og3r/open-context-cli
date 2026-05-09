@@ -59,6 +59,13 @@ const en: StringTable = {
   "settings.launch_mode.option_reuse_desc": "Hand the current terminal over to claude. PTY-based prefill works here.",
   "settings.launch_mode.option_new_window_desc": "Open a new window in your terminal app (Terminal, iTerm, Ghostty, Warp; macOS only). User message is auto-sent as the first prompt.",
   "settings.launch_mode.unsupported_note": "macOS only",
+  "settings.sessions_dir.title": "Sessions directory",
+  "settings.sessions_dir.default_label": "Default: {path}",
+  "settings.sessions_dir.restore": "↺ Restore default",
+  "settings.sessions_dir.placeholder": "(using default)",
+  "settings.sessions_dir.description": "Leave empty to use the default. ⇥ toggles between the path and the restore button.",
+  "settings.session_status.ok": "Sessions found",
+  "settings.session_status.missing": "No valid session found",
 
   // Continue conversation
   "continue.footer_label": "↪ Continue conversation",
@@ -81,12 +88,6 @@ const en: StringTable = {
   "delete.cancel": "Cancel",
   "delete.delete": "Delete",
   "delete.help": "←→ move · ⏎ confirm · esc cancel",
-
-  // Path input
-  "path.brand": "open-context",
-  "path.subtitle": "session browser",
-  "path.no_default": "No sessions found in the default location.",
-  "path.prompt": "Enter a path to a directory or .jsonl file",
 
   // Session list / preview
   "list.msgs_suffix": "msgs",
@@ -112,10 +113,9 @@ const en: StringTable = {
   // Footer hints — pipe-joined strings; one segment per token. Splitting at
   // render time avoids Record<FooterContext,string[]> here, which would force
   // i18n.ts to import a UI type and create a circular dependency.
-  "footer.list":           "↑↓ select|⏎ focus preview|⇥ menu|p path|q quit",
+  "footer.list":           "↑↓ select|⏎ focus preview|⇥ menu|q quit",
   "footer.preview":        "↑↓ scroll|esc back|⌃F find|⇥ expand tool|⏎ continue|q quit",
   "footer.preview-search": "type to search|⏎ commit|esc cancel",
-  "footer.path-input":     "type a path|⏎ submit|esc quit",
   "footer.feature-bar":    "←→ pick|⇥ next|⏎ open|esc back",
   "footer.settings":       "↑↓ field|←→ cursor|space apply|⏎ confirm|esc back",
   "footer.delete-confirm": "←→ choose|⏎ confirm|esc cancel",
@@ -163,6 +163,13 @@ const zh: StringTable = {
   "settings.launch_mode.option_reuse_desc": "把当前终端交给 claude；可用 PTY 自动预填用户消息。",
   "settings.launch_mode.option_new_window_desc": "在你的终端 app 里弹新窗口（支持 Terminal / iTerm / Ghostty / Warp；仅 macOS）。用户消息会自动作为首条 prompt 发送。",
   "settings.launch_mode.unsupported_note": "仅 macOS 支持",
+  "settings.sessions_dir.title": "会话存放目录",
+  "settings.sessions_dir.default_label": "默认：{path}",
+  "settings.sessions_dir.restore": "↺ 恢复默认",
+  "settings.sessions_dir.placeholder": "（使用默认目录）",
+  "settings.sessions_dir.description": "留空则使用默认目录。⇥ 在路径输入框与恢复按钮之间切换。",
+  "settings.session_status.ok": "已找到会话",
+  "settings.session_status.missing": "当前找不到有效的 session",
 
   "continue.footer_label": "↪ 继续对话",
   "continue.footer_label_force": "↪ 继续对话（强制）",
@@ -184,11 +191,6 @@ const zh: StringTable = {
   "delete.delete": "删除",
   "delete.help": "←→ 选择 · ⏎ 确认 · esc 取消",
 
-  "path.brand": "open-context",
-  "path.subtitle": "会话浏览器",
-  "path.no_default": "默认位置未找到任何会话。",
-  "path.prompt": "请输入目录或 .jsonl 文件的路径",
-
   "list.msgs_suffix": "条消息",
   "preview.session_hash_prefix": "会话",
   "preview.msg_hash_prefix": "消息",
@@ -205,10 +207,9 @@ const zh: StringTable = {
   "rt.hours_ago": "{n} 小时前",
   "rt.days_ago": "{n} 天前",
 
-  "footer.list":           "↑↓ 选择|⏎ 进入预览|⇥ 菜单|p 路径|q 退出",
+  "footer.list":           "↑↓ 选择|⏎ 进入预览|⇥ 菜单|q 退出",
   "footer.preview":        "↑↓ 滚动|esc 返回|⌃F 查找|⇥ 展开工具|⏎ 继续对话|q 退出",
   "footer.preview-search": "输入以搜索|⏎ 确认|esc 取消",
-  "footer.path-input":     "输入路径|⏎ 提交|esc 退出",
   "footer.feature-bar":    "←→ 选择|⇥ 下一项|⏎ 打开|esc 返回",
   "footer.settings":       "↑↓ 字段|←→ 光标|空格 切换|⏎ 确认|esc 返回",
   "footer.delete-confirm": "←→ 选择|⏎ 确认|esc 取消",

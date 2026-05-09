@@ -7,7 +7,6 @@ export type FooterContext =
   | "list"
   | "preview"
   | "preview-search"
-  | "path-input"
   | "feature-bar"
   | "settings"
   | "delete-confirm";
