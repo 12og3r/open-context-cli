@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write    # creating GitHub Releases
   id-token: write    # OIDC token for npm provenance
+  packages: write    # publishing to GitHub Packages
 
 jobs:
   publish:
@@ -53,6 +54,23 @@ jobs:
 
       - name: Publish to npm with provenance
         run: npm publish --provenance --access public
+
+      # Mirror to GitHub Packages so the package shows up under the repo's
+      # Packages sidebar on github.com. setup-node rewrites ~/.npmrc to
+      # point at npm.pkg.github.com, then `npm publish` picks up
+      # NODE_AUTH_TOKEN for auth. No --provenance here: GitHub Packages
+      # has its own attestation flow, not the Sigstore one npmjs uses.
+      - name: Reconfigure npm registry for GitHub Packages
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@12og3r'
+
+      - name: Publish to GitHub Packages
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
