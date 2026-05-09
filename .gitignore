@@ -25,3 +25,7 @@ yarn-debug.log*
 # test / coverage artifacts
 coverage/
 .nyc_output/
+
+# local Claude Code tooling
+.agents/
+skills-lock.json
