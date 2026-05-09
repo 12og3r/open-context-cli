@@ -284,12 +284,15 @@ export function applyCursorOverlay(line: string, kind: "header" | "body" | "marg
 // bold/italic. Avoid using \x1b[22m here — it would reset markdown bold too.
 const OUTLINE_OPEN = "\x1b[4m";
 const OUTLINE_CLOSE = "\x1b[24m";
-// Current (selected) match: bright white bg + black fg. High contrast against
-// the underline-only neighbors, so the user sees the cursor position at a
-// glance. Same shape as the previous yellow scheme — \x1b[49m and \x1b[39m
-// only reset bg/fg, leaving any surrounding markdown styles intact.
-const CURRENT_OPEN = "\x1b[107m\x1b[30m";  // bright white bg, black fg
-const CURRENT_CLOSE = "\x1b[49m\x1b[39m";  // default bg, default fg
+// Current (selected) match: red fg + underline. We avoid background-color
+// schemes (bright-bg \x1b[107m, standard bg \x1b[43m, reverse \x1b[7m) because
+// many terminals only paint background on the first cell of a 2-cell CJK
+// glyph, leaving the highlight visibly half-width. Foreground color and
+// underline both apply cell-by-cell, so they always cover the full glyph.
+// The closes (\x1b[39m, \x1b[24m) only reset fg/underline, leaving any
+// surrounding markdown styles intact.
+const CURRENT_OPEN = "\x1b[4m\x1b[31m";
+const CURRENT_CLOSE = "\x1b[24m\x1b[39m";
 
 export function applyHighlight(
   messages: Message[],

@@ -6,14 +6,18 @@ export type FooterContext =
   | "preview"
   | "list-search"
   | "preview-search"
-  | "path-input";
+  | "path-input"
+  | "feature-bar"
+  | "settings";
 
 const HINTS: Record<FooterContext, string[]> = {
-  "list":           ["↑↓ select", "⏎ focus preview", "/ search", "p path", "q quit"],
+  "list":           ["↑↓ select", "⏎ focus preview", "/ search", "esc menu", "p path", "q quit"],
   "preview":        ["↑↓ scroll", "esc back", "⌃F find", "⇥ expand tool", "q quit"],
   "list-search":    ["type to filter", "⏎ apply", "esc cancel"],
   "preview-search": ["type to search", "⏎ commit", "esc cancel"],
   "path-input":     ["type a path", "⏎ submit", "esc quit"],
+  "feature-bar":    ["←→ pick", "⏎ open", "esc back"],
+  "settings":       ["↑↓ field", "←→ cursor", "space apply", "⏎ confirm", "esc back"],
 };
 
 export function Footer({ context }: { context: FooterContext }) {

@@ -116,7 +116,7 @@ describe("SessionPreview", () => {
     // so the user can still see which match is current.
     expect(lastFrame() ?? "").toContain("1 / 1");
     // Highlight survives — current-match white background still in frame
-    expect(lastFrame() ?? "").toContain("\x1b[107m");
+    expect(lastFrame() ?? "").toContain("\x1b[31m");
     // Footer's "X / total" shows cursor on msg index 1 (1-based "2 / 3")
     expect(lastFrame() ?? "").toContain("2 / 3");
   });
@@ -139,7 +139,7 @@ describe("SessionPreview", () => {
     await tick();
     stdin.write("\x1b");          // Esc
     await tick();
-    expect(lastFrame() ?? "").toContain("\x1b[107m");
+    expect(lastFrame() ?? "").toContain("\x1b[31m");
     expect(lastFrame() ?? "").toContain("2 / 3");
   });
 
@@ -161,11 +161,11 @@ describe("SessionPreview", () => {
     await tick();
     stdin.write("\r");
     await tick();
-    expect(lastFrame() ?? "").toContain("\x1b[107m"); // current match white bg
+    expect(lastFrame() ?? "").toContain("\x1b[31m"); // current match red fg
     // Now press j (down) — afterglow clears.
     stdin.write("j");
     await tick();
-    expect(lastFrame() ?? "").not.toContain("\x1b[107m");
+    expect(lastFrame() ?? "").not.toContain("\x1b[31m");
     expect(lastFrame() ?? "").not.toContain("\x1b[4m"); // no underline either
   });
 
@@ -198,7 +198,7 @@ describe("SessionPreview", () => {
     await tick();
     stdin.write("\r"); // commit -> afterglow
     await tick();
-    expect(lastFrame() ?? "").toContain("\x1b[107m");
+    expect(lastFrame() ?? "").toContain("\x1b[31m");
     stdin.write("\x06"); // Ctrl+F again
     await tick();
     // Search bar is open with empty query (no counter visible).
@@ -265,13 +265,13 @@ describe("SessionPreview", () => {
     stdin.write("\r");
     await tick();
     expect(lastFrame() ?? "").toContain("SEARCH");
-    expect(lastFrame() ?? "").toContain("\x1b[107m"); // current still white-bg
+    expect(lastFrame() ?? "").toContain("\x1b[31m"); // current still red fg
 
     // Move on with j → afterglow clears (indicator and highlights both gone)
     stdin.write("j");
     await tick();
     expect(lastFrame() ?? "").not.toContain("SEARCH");
-    expect(lastFrame() ?? "").not.toContain("\x1b[107m");
+    expect(lastFrame() ?? "").not.toContain("\x1b[31m");
     expect(lastFrame() ?? "").not.toContain("\x1b[4m");
   });
 
@@ -307,7 +307,7 @@ describe("SessionPreview", () => {
     stdin.write("\r"); // Enter — must not crash
     await tick();
     // After commit the search bar is gone but a current-match highlight remains.
-    expect(lastFrame() ?? "").toContain("\x1b[107m");
+    expect(lastFrame() ?? "").toContain("\x1b[31m");
   });
 
   test("zero matches show 'no matches' in red", async () => {
