@@ -112,10 +112,11 @@ describe("SessionPreview", () => {
     await tick();
     stdin.write("\r");            // Enter
     await tick();
-    // Search bar is gone; counter not shown
-    expect(lastFrame() ?? "").not.toContain("1 / 1");
-    // Highlight survives — yellow background still in frame
-    expect(lastFrame() ?? "").toContain("\x1b[43m");
+    // Editable search bar is gone, but the afterglow indicator stays visible
+    // so the user can still see which match is current.
+    expect(lastFrame() ?? "").toContain("1 / 1");
+    // Highlight survives — current-match white background still in frame
+    expect(lastFrame() ?? "").toContain("\x1b[107m");
     // Footer's "X / total" shows cursor on msg index 1 (1-based "2 / 3")
     expect(lastFrame() ?? "").toContain("2 / 3");
   });
@@ -138,7 +139,7 @@ describe("SessionPreview", () => {
     await tick();
     stdin.write("\x1b");          // Esc
     await tick();
-    expect(lastFrame() ?? "").toContain("\x1b[43m");
+    expect(lastFrame() ?? "").toContain("\x1b[107m");
     expect(lastFrame() ?? "").toContain("2 / 3");
   });
 
@@ -160,12 +161,12 @@ describe("SessionPreview", () => {
     await tick();
     stdin.write("\r");
     await tick();
-    expect(lastFrame() ?? "").toContain("\x1b[43m"); // yellow current match
+    expect(lastFrame() ?? "").toContain("\x1b[107m"); // current match white bg
     // Now press j (down) — afterglow clears.
     stdin.write("j");
     await tick();
-    expect(lastFrame() ?? "").not.toContain("\x1b[43m");
-    expect(lastFrame() ?? "").not.toContain("\x1b[7m"); // no INVERSE either
+    expect(lastFrame() ?? "").not.toContain("\x1b[107m");
+    expect(lastFrame() ?? "").not.toContain("\x1b[4m"); // no underline either
   });
 
   test("/ opens the search bar", async () => {
@@ -179,7 +180,7 @@ describe("SessionPreview", () => {
     await tick();
     stdin.write("/");
     await tick();
-    expect(lastFrame() ?? "").toContain("🔎");
+    expect(lastFrame() ?? "").toContain("SEARCH");
   });
 
   test("Ctrl+F in afterglow clears the previous query and reopens with empty input", async () => {
@@ -197,12 +198,12 @@ describe("SessionPreview", () => {
     await tick();
     stdin.write("\r"); // commit -> afterglow
     await tick();
-    expect(lastFrame() ?? "").toContain("\x1b[43m");
+    expect(lastFrame() ?? "").toContain("\x1b[107m");
     stdin.write("\x06"); // Ctrl+F again
     await tick();
     // Search bar is open with empty query (no counter visible).
     const out = lastFrame() ?? "";
-    expect(out).toContain("🔎");
+    expect(out).toContain("SEARCH");
     expect(out).not.toMatch(/\d+ \/ \d+/);
   });
 
@@ -247,7 +248,7 @@ describe("SessionPreview", () => {
     // Open via /
     stdin.write("/");
     await tick();
-    expect(lastFrame() ?? "").toContain("🔎");
+    expect(lastFrame() ?? "").toContain("SEARCH");
 
     // Type query
     stdin.write("needle");
@@ -260,20 +261,56 @@ describe("SessionPreview", () => {
     stdin.write("\x1b[A"); // ↑
     await tick();
 
-    // Commit
+    // Commit — afterglow indicator stays so the user can see the position.
     stdin.write("\r");
     await tick();
-    expect(lastFrame() ?? "").not.toContain("🔎");
-    expect(lastFrame() ?? "").toContain("\x1b[43m"); // current still yellow
+    expect(lastFrame() ?? "").toContain("SEARCH");
+    expect(lastFrame() ?? "").toContain("\x1b[107m"); // current still white-bg
 
-    // Move on with j → afterglow clears
+    // Move on with j → afterglow clears (indicator and highlights both gone)
     stdin.write("j");
     await tick();
-    expect(lastFrame() ?? "").not.toContain("\x1b[43m");
-    expect(lastFrame() ?? "").not.toContain("\x1b[7m");
+    expect(lastFrame() ?? "").not.toContain("SEARCH");
+    expect(lastFrame() ?? "").not.toContain("\x1b[107m");
+    expect(lastFrame() ?? "").not.toContain("\x1b[4m");
   });
 
-  test("zero matches show 0 / 0 in red", async () => {
+  test("Enter doesn't crash when narrowing the query leaves matchIndex stale", async () => {
+    // After typing "a" the user navigates to the last (5th) match. Typing "3"
+    // narrows the query to "a3" which has only 1 match — but the init effect's
+    // lastInitKey guard short-circuits the re-anchor, so matchIndex is left
+    // pointing past matches.length. Pressing Enter used to read matches[4]
+    // (undefined) and throw on .msgIndex.
+    const messages = [
+      { role: "user", content: "a1 a2 a3 a4 a5", timestamp: new Date(0), raw: {} },
+    ] as Message[];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="x" focused={true}
+                      height={20} width={60} emoji={false} />
+    );
+    await tick();
+    stdin.write("\x06"); // Ctrl+F
+    await tick();
+    stdin.write("a");
+    await tick();
+    expect(lastFrame() ?? "").toContain("1 / 5");
+    // Walk to the last match.
+    for (let i = 0; i < 4; i++) {
+      stdin.write("\x1b[B"); // ↓
+      await tick();
+    }
+    expect(lastFrame() ?? "").toContain("5 / 5");
+    // Narrow to "a3" — only one match remains.
+    stdin.write("3");
+    await tick();
+    // Now the bug: matchIndex still = 4 in spite of matches.length === 1.
+    stdin.write("\r"); // Enter — must not crash
+    await tick();
+    // After commit the search bar is gone but a current-match highlight remains.
+    expect(lastFrame() ?? "").toContain("\x1b[107m");
+  });
+
+  test("zero matches show 'no matches' in red", async () => {
     const messages = [
       { role: "user", content: "nothing here", timestamp: new Date(0), raw: {} },
     ] as Message[];
@@ -287,6 +324,6 @@ describe("SessionPreview", () => {
     stdin.write("zzz");
     await tick();
     const out = lastFrame() ?? "";
-    expect(out).toContain("0 / 0");
+    expect(out).toContain("no matches");
   });
 });

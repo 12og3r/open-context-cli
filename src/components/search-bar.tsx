@@ -12,6 +12,7 @@ export function SearchBar({
   onNext,
   matchIndex,
   matchCount,
+  readOnly = false,
 }: {
   value: string;
   onChange: (s: string) => void;
@@ -21,36 +22,48 @@ export function SearchBar({
   onNext: () => void;
   matchIndex: number;
   // matchCount < 0 suppresses the counter — used by the session-list filter
-  // where the bar is a filter, not a navigable search.
+  // where the bar is a filter, not a navigable search. The pill label flips
+  // to "FILTER" in that case.
   matchCount: number;
+  // readOnly drops the input + cursor and shows a dimmed echo of `value`.
+  // Used during afterglow so the user can still see what they searched for
+  // and which match is current.
+  readOnly?: boolean;
 }) {
   const showCounter = matchCount >= 0;
   const hasQuery = value.length > 0;
   const zero = showCounter && hasQuery && matchCount === 0;
-  const counterText = !showCounter
-    ? ""
-    : !hasQuery
-      ? ""
-      : matchCount === 0
-        ? "0 / 0"
-        : `${matchIndex + 1} / ${matchCount}`;
+  const label = matchCount < 0 ? " FILTER " : " SEARCH ";
+  const pillBg = zero ? "red" : "cyan";
 
   return (
     <Box>
-      <Text color={zero ? "red" : "cyan"}>🔎 </Text>
+      <Box marginRight={1}>
+        <Text backgroundColor={pillBg} color="black" bold>{label}</Text>
+      </Box>
       <Box flexGrow={1}>
-        <MinimalInput
-          value={value}
-          onChange={onChange}
-          onSubmit={onSubmit}
-          onCancel={onCancel}
-          onPrev={onPrev}
-          onNext={onNext}
-        />
+        {readOnly ? (
+          <Text dimColor>{value}</Text>
+        ) : (
+          <MinimalInput
+            value={value}
+            onChange={onChange}
+            onSubmit={onSubmit}
+            onCancel={onCancel}
+            onPrev={onPrev}
+            onNext={onNext}
+          />
+        )}
       </Box>
-      <Box marginLeft={1}>
-        <Text color={zero ? "red" : "gray"}>{counterText}</Text>
-      </Box>
+      {showCounter && hasQuery && (
+        <Box marginLeft={2}>
+          {zero ? (
+            <Text color="red" bold>no matches</Text>
+          ) : (
+            <Text dimColor>{matchIndex + 1} / {matchCount}</Text>
+          )}
+        </Box>
+      )}
     </Box>
   );
 }

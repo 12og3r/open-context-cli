@@ -180,16 +180,20 @@ const YIELD_EVERY = 64;
  * doesn't block the React commit / event loop.
  */
 export function renderConversation(messages: Message[], opts: RenderConversationOpts): ConversationBuffer {
-  const useCache = !opts.query;
-  const { messages: hl, matches } = useCache
-    ? { messages, matches: [] as Match[] }
-    : applyHighlight(messages, opts.query, opts.matchIndex);
+  const hasQuery = !!opts.query;
+  const { messages: hl, matches } = hasQuery
+    ? applyHighlight(messages, opts.query, opts.matchIndex)
+    : { messages, matches: [] as Match[] };
   const lines: string[] = [];
   const startLine: number[] = new Array(hl.length);
   const endLine: number[] = new Array(hl.length);
   for (let i = 0; i < hl.length; i++) {
     startLine[i] = lines.length;
-    const msgLines = renderOne(hl[i]!, opts, useCache, i);
+    // Only messages whose content was rewritten by applyHighlight (new ref)
+    // bypass the WeakMap cache. The rest still hit it, so a search query
+    // that matches a few of N messages isn't an N-message re-render.
+    const cacheable = hl[i] === messages[i];
+    const msgLines = renderOne(hl[i]!, opts, cacheable, i);
     for (const ml of msgLines) lines.push(ml);
     endLine[i] = lines.length;
   }
@@ -216,17 +220,21 @@ export async function renderConversationAsync(
   opts: RenderConversationOpts,
   isCancelled?: () => boolean,
 ): Promise<ConversationBuffer> {
-  const useCache = !opts.query;
-  const { messages: hl, matches } = useCache
-    ? { messages, matches: [] as Match[] }
-    : applyHighlight(messages, opts.query, opts.matchIndex);
+  const hasQuery = !!opts.query;
+  const { messages: hl, matches } = hasQuery
+    ? applyHighlight(messages, opts.query, opts.matchIndex)
+    : { messages, matches: [] as Match[] };
   const lines: string[] = [];
   const startLine: number[] = new Array(hl.length);
   const endLine: number[] = new Array(hl.length);
   for (let i = 0; i < hl.length; i++) {
     if (isCancelled?.()) throw new CancelledError();
     startLine[i] = lines.length;
-    const msgLines = renderOne(hl[i]!, opts, useCache, i);
+    // Per-message cache decision: messages whose content was rewritten by
+    // applyHighlight (new ref) bypass the WeakMap cache; the rest still hit
+    // it so a sparse search isn't an N-message markdown re-render.
+    const cacheable = hl[i] === messages[i];
+    const msgLines = renderOne(hl[i]!, opts, cacheable, i);
     for (const ml of msgLines) lines.push(ml);
     endLine[i] = lines.length;
     if ((i + 1) % YIELD_EVERY === 0) {
@@ -271,9 +279,16 @@ export function applyCursorOverlay(line: string, kind: "header" | "body" | "marg
   return `  ${FG_CYAN}▏${RESET} ` + line.slice(4);
 }
 
-const INVERSE = "\x1b[7m";
-const INVERSE_OFF = "\x1b[27m";
-const CURRENT_OPEN = "\x1b[43m\x1b[30m";   // yellow bg, black fg
+// Outline (non-current) matches: underline only. Underline is rarely used by
+// markdown body text, so opening 4m / closing 24m doesn't clobber any embedded
+// bold/italic. Avoid using \x1b[22m here — it would reset markdown bold too.
+const OUTLINE_OPEN = "\x1b[4m";
+const OUTLINE_CLOSE = "\x1b[24m";
+// Current (selected) match: bright white bg + black fg. High contrast against
+// the underline-only neighbors, so the user sees the cursor position at a
+// glance. Same shape as the previous yellow scheme — \x1b[49m and \x1b[39m
+// only reset bg/fg, leaving any surrounding markdown styles intact.
+const CURRENT_OPEN = "\x1b[107m\x1b[30m";  // bright white bg, black fg
 const CURRENT_CLOSE = "\x1b[49m\x1b[39m";  // default bg, default fg
 
 export function applyHighlight(
@@ -302,8 +317,8 @@ export function applyHighlight(
     for (const { m: match, globalIdx } of list) {
       result += m.content.slice(cursor, match.contentOffset);
       const isCurrent = globalIdx === matchIndex;
-      const open = isCurrent ? CURRENT_OPEN : INVERSE;
-      const close = isCurrent ? CURRENT_CLOSE : INVERSE_OFF;
+      const open = isCurrent ? CURRENT_OPEN : OUTLINE_OPEN;
+      const close = isCurrent ? CURRENT_CLOSE : OUTLINE_CLOSE;
       result +=
         open +
         m.content.slice(match.contentOffset, match.contentOffset + match.length) +

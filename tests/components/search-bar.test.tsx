@@ -26,10 +26,10 @@ function Harness(props: {
 }
 
 describe("SearchBar", () => {
-  test("renders the magnifying glass and the typed query", () => {
+  test("renders the SEARCH pill and the typed query", () => {
     const { lastFrame } = render(<Harness matchCount={5} matchIndex={2} />);
     const out = lastFrame() ?? "";
-    expect(out).toContain("🔎");
+    expect(out).toContain("SEARCH");
     expect(out).toContain("useState");
   });
 
@@ -38,9 +38,17 @@ describe("SearchBar", () => {
     expect(lastFrame() ?? "").toContain("3 / 5");
   });
 
-  test("shows 0 / 0 in red when there are zero matches", () => {
+  test("shows 'no matches' instead of a counter when there are zero matches", () => {
     const { lastFrame } = render(<Harness matchIndex={-1} matchCount={0} />);
     const out = lastFrame() ?? "";
-    expect(out).toContain("0 / 0");
+    expect(out).toContain("no matches");
+    expect(out).not.toContain("0 / 0");
+  });
+
+  test("uses a FILTER pill when matchCount is negative", () => {
+    const { lastFrame } = render(<Harness matchIndex={-1} matchCount={-1} />);
+    const out = lastFrame() ?? "";
+    expect(out).toContain("FILTER");
+    expect(out).not.toContain("SEARCH");
   });
 });

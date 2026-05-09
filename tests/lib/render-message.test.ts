@@ -14,22 +14,22 @@ describe("applyHighlight", () => {
     expect(r.matches).toEqual([]);
   });
 
-  test("wraps non-current matches in INVERSE", () => {
+  test("wraps non-current matches in underline (outline style)", () => {
     const r = applyHighlight([msg("aa bb aa")], "aa", 1);
-    // current is index 1 (second occurrence) → yellow; first stays INVERSE
-    expect(r.messages[0]?.content).toContain("\x1b[7maa\x1b[27m");
-    expect(r.messages[0]?.content).toContain("\x1b[43m\x1b[30maa\x1b[49m\x1b[39m");
+    // current is index 1 (second occurrence) → white-bg; first stays underline
+    expect(r.messages[0]?.content).toContain("\x1b[4maa\x1b[24m");
+    expect(r.messages[0]?.content).toContain("\x1b[107m\x1b[30maa\x1b[49m\x1b[39m");
   });
 
-  test("wraps current match in yellow-on-black", () => {
+  test("wraps current match in bright-white-on-black", () => {
     const r = applyHighlight([msg("hello world hello")], "hello", 0);
-    expect(r.messages[0]?.content.indexOf("\x1b[43m\x1b[30mhello\x1b[49m\x1b[39m")).toBe(0);
+    expect(r.messages[0]?.content.indexOf("\x1b[107m\x1b[30mhello\x1b[49m\x1b[39m")).toBe(0);
   });
 
-  test("matchIndex of -1 makes every match reverse-video", () => {
+  test("matchIndex of -1 makes every match underline-only", () => {
     const r = applyHighlight([msg("aa aa")], "aa", -1);
-    expect(r.messages[0]?.content).not.toContain("\x1b[43m");
-    expect((r.messages[0]?.content.match(/\x1b\[7m/g) ?? []).length).toBe(2);
+    expect(r.messages[0]?.content).not.toContain("\x1b[107m");
+    expect((r.messages[0]?.content.match(/\x1b\[4m/g) ?? []).length).toBe(2);
   });
 
   test("returns matches with stable indices across messages", () => {

@@ -63,24 +63,32 @@ export function SessionPreview({
     setMatchIndex(-1);
     lastInitKey.current = null;
     lastAnchorRef.current = null;
+    // Wipe the buffer so the spinner shows for the new session, instead of
+    // flashing the previous session's content while the new render is in flight.
+    setBuffer(EMPTY_BUFFER);
   }, [sessionId]);
 
   const lastIdx = Math.max(0, messages.length - 1);
-  const viewportHeight = Math.max(1, height - 1 - (searchOpen ? 1 : 0));
+  // The search row is visible while the user is typing (searchOpen) AND
+  // while the committed query's highlights are still on screen (afterglow),
+  // so the user always sees what they searched for and which match is current.
+  // When shown, it's the bar + a thin separator rule = 2 rows.
+  const showSearchRow = searchOpen || committedQuery !== "";
+  const viewportHeight = Math.max(1, height - 1 - (showSearchRow ? 2 : 0));
   const query = committedQuery || (searchOpen ? searchValue : "");
 
   const effectiveCursor = pinToBottom ? lastIdx : Math.min(cursor, lastIdx);
 
   // The buffer is built off the render path so a heavy markdown→ANSI pass
   // (~700 ms on a 1000-message session) doesn't block the React commit
-  // phase or the terminal-input handlers. While the build is in flight we
-  // show a spinner; the build is cancelled if the inputs change underneath.
+  // phase or the terminal-input handlers. We keep the previous buffer
+  // visible while the next render is in flight so typing in the search bar
+  // doesn't flash the screen on every keystroke; only the initial build
+  // (buffer === EMPTY_BUFFER) shows the spinner.
   const [buffer, setBuffer] = useState<ConversationBuffer>(EMPTY_BUFFER);
-  const [isBuilding, setIsBuilding] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    setIsBuilding(true);
     (async () => {
       try {
         const result = await renderConversationAsync(
@@ -90,7 +98,6 @@ export function SessionPreview({
         );
         if (cancelled) return;
         setBuffer(result);
-        setIsBuilding(false);
       } catch (err) {
         if (err instanceof CancelledError) return;
         throw err;
@@ -110,6 +117,19 @@ export function SessionPreview({
   useEffect(() => {
     if (!pinToBottom && actualScrollLine !== scrollLine) setScrollLine(actualScrollLine);
   }, [actualScrollLine, scrollLine, pinToBottom]);
+
+  // Keep matchIndex in bounds whenever the matches array changes. The init
+  // effect's lastInitKey guard short-circuits a re-anchor once a query is
+  // already in flight, so a buffer that settles with a smaller match set
+  // would otherwise leave matchIndex pointing past matches.length. Loop is
+  // bounded — once matchIndex is in range the body is a no-op.
+  useEffect(() => {
+    if (matches.length === 0) {
+      if (matchIndex !== -1) setMatchIndex(-1);
+    } else if (matchIndex >= matches.length) {
+      setMatchIndex(matches.length - 1);
+    }
+  }, [matches, matchIndex]);
 
   // Scroll the viewport so that match `m` is visible. The line is approximate:
   // it interpolates by character offset within the message, which can drift
@@ -255,8 +275,16 @@ export function SessionPreview({
     setSearchOpen(false);
     setCommittedQuery(searchValue);
     lastAnchorRef.current = null;
-    if (matches.length > 0 && matchIndex >= 0) {
-      const target = matches[matchIndex]!;
+    // Clamp defensively: narrowing a query (e.g. "a"→"a3") can shrink matches
+    // before the init effect re-anchors, so matchIndex may have drifted past
+    // matches.length. Without this guard, matches[matchIndex] is undefined
+    // and target.msgIndex throws.
+    if (matches.length > 0) {
+      const safeIdx = matchIndex >= 0 && matchIndex < matches.length
+        ? matchIndex
+        : 0;
+      if (safeIdx !== matchIndex) setMatchIndex(safeIdx);
+      const target = matches[safeIdx]!;
       setCursor(target.msgIndex);
       setPinToBottom(target.msgIndex === lastIdx);
     }
@@ -330,7 +358,9 @@ export function SessionPreview({
     );
   }
 
-  if (isBuilding) {
+  // Initial build only — once we have a buffer we keep showing it through
+  // subsequent re-renders, so typing in search doesn't flash the spinner.
+  if (buffer === EMPTY_BUFFER) {
     return (
       <Box width={width} height={height} alignItems="center" justifyContent="center">
         <Box>
@@ -364,19 +394,32 @@ export function SessionPreview({
     }
   }
 
+  // After the clamp effect runs matchIndex is in [0, matches.length); use a
+  // local clamp here too so the afterglow indicator never shows a stale
+  // out-of-range position during the brief window before the effect commits.
+  const displayMatchIndex = matches.length > 0 && matchIndex >= 0
+    ? Math.min(matchIndex, matches.length - 1)
+    : -1;
+
   return (
     <Box flexDirection="column" width={width} height={height}>
-      {searchOpen && (
-        <SearchBar
-          value={searchValue}
-          onChange={setSearchValue}
-          onSubmit={commitSearch}
-          onCancel={commitSearch}
-          onPrev={onPrev}
-          onNext={onNext}
-          matchIndex={matchIndex}
-          matchCount={matchCount}
-        />
+      {showSearchRow && (
+        <>
+          <SearchBar
+            value={searchOpen ? searchValue : committedQuery}
+            onChange={setSearchValue}
+            onSubmit={commitSearch}
+            onCancel={commitSearch}
+            onPrev={onPrev}
+            onNext={onNext}
+            matchIndex={searchOpen ? matchIndex : displayMatchIndex}
+            matchCount={matchCount}
+            readOnly={!searchOpen}
+          />
+          <Box flexShrink={0}>
+            <Text dimColor>{"─".repeat(width)}</Text>
+          </Box>
+        </>
       )}
       <Box flexDirection="column" flexGrow={1}>
         {visibleLines.map((line, i) => (
