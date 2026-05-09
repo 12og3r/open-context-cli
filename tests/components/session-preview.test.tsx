@@ -370,7 +370,10 @@ describe("SessionPreview", () => {
   });
 
   test("Enter on assistant message opens continue footer; second Enter fires onRequestContinue with target", async () => {
-    const onRequest = mock((_info: { targetUuid: string; targetRole: "user" | "assistant"; userText?: string }) => {});
+    const onRequest = mock(
+      (_info: { targetUuid: string; targetRole: "user" | "assistant"; userText?: string }) =>
+        ({ ok: true }) as { ok: true } | { ok: false; error: string },
+    );
     const messages: Message[] = [
       { role: "user", content: "msg one", timestamp: new Date(0), uuid: "u1", raw: {} },
       { role: "assistant", content: "reply one", timestamp: new Date(0), uuid: "a1", raw: {} },
@@ -398,7 +401,10 @@ describe("SessionPreview", () => {
   });
 
   test("Enter on user message exposes content as userText", async () => {
-    const onRequest = mock((_info: { targetUuid: string; targetRole: "user" | "assistant"; userText?: string }) => {});
+    const onRequest = mock(
+      (_info: { targetUuid: string; targetRole: "user" | "assistant"; userText?: string }) =>
+        ({ ok: true }) as { ok: true } | { ok: false; error: string },
+    );
     const messages: Message[] = [
       { role: "user", content: "the very last user msg", timestamp: new Date(0), uuid: "uX", raw: {} },
     ];
@@ -427,8 +433,39 @@ describe("SessionPreview", () => {
     });
   });
 
+  test("validation error keeps the footer open and shows the message in red", async () => {
+    const onRequest = mock(
+      (_info: { targetUuid: string; targetRole: "user" | "assistant"; userText?: string }) =>
+        ({ ok: false, error: "session file no longer exists on disk" }) as
+          | { ok: true }
+          | { ok: false; error: string },
+    );
+    const messages: Message[] = [
+      { role: "user", content: "hi", timestamp: new Date(0), uuid: "u1", raw: {} },
+    ];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="s" focused={true} height={10} width={60} emoji={false} onRequestContinue={onRequest} />
+    );
+    await tick();
+    stdin.write("\r");
+    await tick();
+    stdin.write("\r");                 // confirm — fails validation
+    await tick();
+    const out = lastFrame() ?? "";
+    expect(out).toContain("Continue conversation");           // footer still up
+    expect(out).toContain("session file no longer exists on disk"); // error visible
+    // Esc clears both
+    stdin.write("\x1b");
+    await tick();
+    const after = lastFrame() ?? "";
+    expect(after).not.toContain("Continue conversation");
+    expect(after).not.toContain("session file no longer exists on disk");
+  });
+
   test("Esc closes the continue footer without firing the request", async () => {
-    const onRequest = mock(() => {});
+    const onRequest = mock(
+      () => ({ ok: true }) as { ok: true } | { ok: false; error: string },
+    );
     const messages: Message[] = [
       { role: "user", content: "hi", timestamp: new Date(0), uuid: "u1", raw: {} },
     ];

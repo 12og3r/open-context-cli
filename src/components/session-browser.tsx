@@ -1,9 +1,13 @@
 import React, { useMemo, useState } from "react";
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { Box, Text, useInput, useStdout } from "ink";
 import Spinner from "ink-spinner";
 import type { SessionMeta, SessionProvider } from "../providers/types.ts";
 import type { ContinueRequest } from "../lib/continue-types.ts";
+import { decodeProjectPath } from "../lib/decode-project-path.ts";
 import { SessionList } from "./session-list.tsx";
 import { SessionPreview } from "./session-preview.tsx";
 import { SearchBar } from "./search-bar.tsx";
@@ -340,7 +344,31 @@ export function SessionBrowser({
                   emoji={emoji}
                   showHash={settings.showHash}
                   onRequestContinue={(info) => {
-                    if (!selected || !onRequestContinue) return;
+                    if (!selected || !onRequestContinue) return { ok: true };
+
+                    // Pre-flight checks done while Ink is still up so we can
+                    // surface failures as a red line under the footer instead
+                    // of crashing out to a stderr message after unmount.
+                    if (!fsSync.existsSync(selected.filePath)) {
+                      return { ok: false, error: t(lang, "continue.error_source_missing") };
+                    }
+                    const slug = path.basename(path.dirname(selected.filePath));
+                    const decodedCwd = decodeProjectPath(slug);
+                    if (decodedCwd && !fsSync.existsSync(decodedCwd)) {
+                      return {
+                        ok: false,
+                        error: t(lang, "continue.error_cwd_missing", { cwd: decodedCwd }),
+                      };
+                    }
+                    const claudeProbe = spawnSync(
+                      process.platform === "win32" ? "where" : "which",
+                      ["claude"],
+                      { stdio: "ignore" },
+                    );
+                    if (claudeProbe.status !== 0) {
+                      return { ok: false, error: t(lang, "continue.error_no_claude") };
+                    }
+
                     onRequestContinue({
                       sourcePath: selected.filePath,
                       targetUuid: info.targetUuid,
@@ -348,6 +376,7 @@ export function SessionBrowser({
                       userText: info.userText,
                       launchMode: settings.continueLaunchMode,
                     });
+                    return { ok: true };
                   }}
                 />
               )}

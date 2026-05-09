@@ -33,7 +33,14 @@ export function SessionPreview({
   width: number;
   emoji?: boolean;
   showHash?: boolean;
-  onRequestContinue?: (info: { targetUuid: string; targetRole: "user" | "assistant"; userText?: string }) => void;
+  // Returns { ok: true } when validation passed and the launch was kicked off,
+  // or { ok: false, error } when a pre-flight check failed. Preview shows the
+  // error in red below the confirm footer; user dismisses with Esc.
+  onRequestContinue?: (info: {
+    targetUuid: string;
+    targetRole: "user" | "assistant";
+    userText?: string;
+  }) => { ok: true } | { ok: false; error: string };
 }) {
   const lang = useLang();
   // pinToBottom: while true, the viewport sticks to the latest message and the
@@ -50,6 +57,10 @@ export function SessionPreview({
   // confirm row and ordinary preview navigation is suppressed. Enter confirms,
   // Esc cancels.
   const [continueOpen, setContinueOpen] = useState(false);
+  // continueError: set when a pre-launch check (source file missing, project
+  // dir missing, claude not on PATH) reports failure. Shown red beneath the
+  // footer; cleared on Esc.
+  const [continueError, setContinueError] = useState<string | null>(null);
 
   // Track the query|messages.length pair for which we last placed the initial
   // matchIndex. Using a ref avoids adding matchIndex to the dep array (which
@@ -74,6 +85,7 @@ export function SessionPreview({
     setCommittedQuery("");
     setMatchIndex(-1);
     setContinueOpen(false);
+    setContinueError(null);
     lastInitKey.current = null;
     lastAnchorRef.current = null;
     // Wipe the buffer so the spinner shows for the new session, instead of
@@ -88,8 +100,12 @@ export function SessionPreview({
   // When shown, it's the bar + a thin separator rule = 2 rows.
   const showSearchRow = searchOpen || committedQuery !== "";
   // Both rows take 2 lines (separator + content). Reserve room for whichever
-  // are visible so the message list isn't clipped from the bottom.
-  const extraRows = (showSearchRow ? 2 : 0) + (continueOpen ? 2 : 0);
+  // are visible so the message list isn't clipped from the bottom. Add one
+  // extra row when a continue-error is showing under the label.
+  const extraRows =
+    (showSearchRow ? 2 : 0) +
+    (continueOpen ? 2 : 0) +
+    (continueError ? 1 : 0);
   const viewportHeight = Math.max(1, height - 1 - extraRows);
   const query = committedQuery || (searchOpen ? searchValue : "");
 
@@ -320,18 +336,25 @@ export function SessionPreview({
         trace("preview", `confirm target=${target} role=${msg?.role} uuid=${msg?.uuid?.slice(0, 8) ?? "(none)"}`);
         if (msg && (msg.role === "user" || msg.role === "assistant") && typeof msg.uuid === "string") {
           trace("preview", "calling onRequestContinue");
-          onRequestContinue?.({
+          const result = onRequestContinue?.({
             targetUuid: msg.uuid,
             targetRole: msg.role,
             userText: msg.role === "user" ? msg.content : undefined,
           });
-          trace("preview", "onRequestContinue returned");
+          trace("preview", `onRequestContinue returned ok=${result?.ok ?? "undef"}`);
+          if (result && !result.ok) {
+            // Stay in continueOpen; render the error red beneath the label.
+            setContinueError(result.error);
+            return;
+          }
+          setContinueError(null);
         } else {
           trace("preview", `gate failed: msg=${!!msg} uuidIsString=${typeof msg?.uuid === "string"}`);
         }
         setContinueOpen(false);
       } else if (key.escape) {
         setContinueOpen(false);
+        setContinueError(null);
       }
       return;
     }
@@ -480,6 +503,9 @@ export function SessionPreview({
           <Text wrap="truncate" color="cyan" bold>
             {t(lang, "continue.footer_label")}
           </Text>
+          {continueError && (
+            <Text wrap="truncate" color="red">{continueError}</Text>
+          )}
         </Box>
       )}
       {(showOverflowHint || showHash) && (

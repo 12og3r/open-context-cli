@@ -68,6 +68,8 @@ const en: StringTable = {
   "continue.error_unsupported": "\"new window\" mode is not supported on this platform",
   "continue.error_fork_failed": "failed to fork session: {detail}",
   "continue.error_launch_failed": "failed to launch claude: {detail}",
+  "continue.error_source_missing": "session file no longer exists on disk",
+  "continue.error_cwd_missing": "project directory not found: {cwd}",
   "continue.spawn_new_window_hint": "A new Terminal window has opened — paste with Cmd+V if a message was prepared.",
 
   // Delete dialog
@@ -169,6 +171,8 @@ const zh: StringTable = {
   "continue.error_unsupported": "当前平台不支持「弹出新终端窗口」",
   "continue.error_fork_failed": "分叉会话失败：{detail}",
   "continue.error_launch_failed": "启动 claude 失败：{detail}",
+  "continue.error_source_missing": "源会话文件已不存在",
+  "continue.error_cwd_missing": "项目目录不存在：{cwd}",
   "continue.spawn_new_window_hint": "新终端窗口已打开 —— 如有预填消息，请在新窗口里 Cmd+V 粘贴。",
 
   "delete.prompt": "删除该会话？",
