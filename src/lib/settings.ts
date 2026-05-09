@@ -4,17 +4,20 @@ import path from "node:path";
 import { DEFAULT_LANG, LANGS, type Lang } from "./i18n.ts";
 
 export type DisplayMode = "concise" | "full";
+export type ContinueLaunchMode = "reuse-current" | "new-window";
 
 export interface Settings {
   displayMode: DisplayMode;
   showHash: boolean;
   language: Lang;
+  continueLaunchMode: ContinueLaunchMode;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   displayMode: "full",
   showHash: true,
   language: DEFAULT_LANG,
+  continueLaunchMode: "reuse-current",
 };
 
 export function settingsDir(): string {
@@ -59,6 +62,9 @@ function sanitize(p: Partial<Settings>): Partial<Settings> {
   }
   if (typeof p.language === "string" && (LANGS as readonly string[]).includes(p.language)) {
     out.language = p.language as Lang;
+  }
+  if (p.continueLaunchMode === "reuse-current" || p.continueLaunchMode === "new-window") {
+    out.continueLaunchMode = p.continueLaunchMode;
   }
   return out;
 }
