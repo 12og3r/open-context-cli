@@ -1,21 +1,29 @@
-# open-context-cli
+# openctx
 
 A terminal UI for browsing your local Claude Code session history.
 
-`open-context` reads the JSONL transcripts that Claude Code writes to
+`openctx` reads the JSONL transcripts that Claude Code writes to
 `~/.claude/projects/` and presents them as a two-pane browser: sessions on the
 left, the rendered conversation on the right. Markdown is rendered to ANSI,
-tool calls collapse to one line by default, and `/` opens an incremental
-search over both the session list and the active conversation.
+tool calls collapse to one line by default, and a `Ctrl-F` search inside the
+preview lets you jump through hits in the active conversation.
 
 ## Install
 
-The package is not published yet. Build and link it locally:
+```bash
+npm install -g @12og3r/openctx
+```
+
+Requires Node ≥ 20. Bun is also supported — if you install under Bun, the
+`bun-pty` optional dependency is picked up automatically for the
+continue-conversation feature.
+
+### Build from source
 
 ```bash
 bun install
 bun run build
-bun link        # exposes the `open-context` binary on your PATH
+bun link        # exposes the `openctx` binary on your PATH
 ```
 
 Or run straight from source during development:
@@ -27,25 +35,27 @@ bun run dev
 ## Usage
 
 ```bash
-open-context                      # scan ~/.claude/projects
-open-context --path ./logs        # use a custom directory or a single .jsonl
-open-context --no-emoji           # plain role labels instead of emoji
-open-context --help
+openctx                      # scan ~/.claude/projects
+openctx --path ./logs        # use a custom directory or a single .jsonl
+openctx --no-emoji           # plain role labels instead of emoji
+openctx --help
 ```
 
-If no sessions are found at the default location, the app prompts for a path.
+If no sessions are found at the default location, `openctx` opens directly
+on the Settings panel with a red status indicator next to the *Sessions
+directory* field, so you can point it at the right path without leaving the
+app.
 
 ## Key bindings
 
 **Session list**
 
-| Key            | Action                          |
-| -------------- | ------------------------------- |
-| `↑` / `↓` `j` / `k` | Move selection             |
-| `⏎` / `→` / `l` | Focus the preview pane         |
-| `/`            | Filter sessions by summary/path |
-| `p`            | Re-enter a different root path  |
-| `q` / `Ctrl-C` | Quit                            |
+| Key            | Action                                 |
+| -------------- | -------------------------------------- |
+| `↑` / `↓` `j` / `k` | Move selection                    |
+| `⏎` / `→` / `l` | Focus the preview pane                |
+| `Tab`          | Open the feature bar (Settings, Delete)|
+| `q` / `Ctrl-C` | Quit                                   |
 
 **Preview pane**
 
@@ -62,7 +72,7 @@ If no sessions are found at the default location, the app prompts for a path.
 
 With the cursor on any user or assistant message, hit `⏎` once to reveal a
 *Continue conversation* row at the bottom of the preview, then `⏎` again to
-fork the session. `open-context` writes a fresh JSONL alongside the original
+fork the session. `openctx` writes a fresh JSONL alongside the original
 (new UUID, same project directory) containing the entries up to your cut
 point, then runs `claude --resume <new-uuid>`.
 
@@ -76,9 +86,9 @@ What happens at the cut point depends on which message you picked:
 
 The Settings panel exposes a *Continue-conversation launch mode* option:
 
-- **Reuse current terminal** (default) — `open-context` exits and hands the
+- **Reuse current terminal** (default) — `openctx` exits and hands the
   current terminal over to `claude` via [`@lydell/node-pty`][nodepty].
-- **Open in new terminal window** (macOS only) — `open-context` keeps
+- **Open in new terminal window** (macOS only) — `openctx` keeps
   running, copies the user message to the clipboard with `pbcopy`, and asks
   Terminal.app to open a fresh window. Paste with Cmd+V.
 
@@ -88,7 +98,7 @@ The Settings panel exposes a *Continue-conversation launch mode* option:
 
 Claude Code stores one directory per workspace under `~/.claude/projects/`,
 with a `.jsonl` file per session. The directory name is a slugified version of
-the absolute project path (slashes replaced with dashes). `open-context`
+the absolute project path (slashes replaced with dashes). `openctx`
 decodes that back into a real path so the list shows where the session ran.
 
 You can also point `--path` at any directory of `.jsonl` files, or at a single
@@ -101,7 +111,7 @@ The codebase is intentionally small:
 ```
 src/
 ├── cli.tsx            # arg parsing + render(<App />)
-├── app.tsx            # top-level state machine: scan → path-input → browser
+├── app.tsx            # top-level state machine: scan → browser
 ├── components/        # ink components (list, preview, search bar, footer …)
 ├── hooks/             # session-listing and session-detail loaders
 ├── lib/               # markdown→ANSI, jsonl streaming, path decoding, matching
