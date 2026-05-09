@@ -111,7 +111,7 @@ const en: StringTable = {
   // render time avoids Record<FooterContext,string[]> here, which would force
   // i18n.ts to import a UI type and create a circular dependency.
   "footer.list":           "↑↓ select|⏎ focus preview|/ search|⇥ menu|p path|q quit",
-  "footer.preview":        "↑↓ scroll|esc back|⌃F find|⇥ expand tool|q quit",
+  "footer.preview":        "↑↓ scroll|esc back|⌃F find|⇥ expand tool|⏎ continue|q quit",
   "footer.list-search":    "type to filter|⏎ apply|esc cancel",
   "footer.preview-search": "type to search|⏎ commit|esc cancel",
   "footer.path-input":     "type a path|⏎ submit|esc quit",
@@ -203,7 +203,7 @@ const zh: StringTable = {
   "rt.days_ago": "{n} 天前",
 
   "footer.list":           "↑↓ 选择|⏎ 进入预览|/ 搜索|⇥ 菜单|p 路径|q 退出",
-  "footer.preview":        "↑↓ 滚动|esc 返回|⌃F 查找|⇥ 展开工具|q 退出",
+  "footer.preview":        "↑↓ 滚动|esc 返回|⌃F 查找|⇥ 展开工具|⏎ 继续对话|q 退出",
   "footer.list-search":    "输入以筛选|⏎ 应用|esc 取消",
   "footer.preview-search": "输入以搜索|⏎ 确认|esc 取消",
   "footer.path-input":     "输入路径|⏎ 提交|esc 退出",
