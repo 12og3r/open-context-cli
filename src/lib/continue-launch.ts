@@ -17,10 +17,16 @@ export interface ContinueResult {
   childExitCode?: number;
 }
 
+const debug = (s: string) => {
+  if (process.env.OPEN_CONTEXT_DEBUG) process.stderr.write(`[oc:launch] ${s}\n`);
+};
+
 export async function executeContinue(req: ContinueRequest): Promise<ContinueResult> {
+  debug(`enter mode=${req.launchMode} role=${req.targetRole} uuid=${req.targetUuid.slice(0, 8)}`);
   if (!hasClaudeOnPath()) {
     return { ok: false, error: "claude not found in PATH" };
   }
+  debug("preflight: claude on PATH");
 
   if (req.launchMode === "reuse-current" && !process.stdout.isTTY) {
     return { ok: false, error: "current stdout is not a TTY" };
@@ -33,6 +39,7 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
   const newUuid = randomUUID();
   const dir = path.dirname(req.sourcePath);
   const dstPath = path.join(dir, `${newUuid}.jsonl`);
+  debug(`fork → ${dstPath}`);
 
   try {
     await forkSession({
@@ -45,12 +52,16 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
   } catch (e) {
     return { ok: false, error: `failed to fork session: ${(e as Error).message}` };
   }
+  debug("fork ok");
 
   const cwd = await detectProjectCwd(req.sourcePath);
+  debug(`cwd=${cwd}`);
 
   if (req.launchMode === "reuse-current") {
+    debug("runPty starting");
     try {
       const code = await runPty({ cwd, resumeId: newUuid, prefillText: req.userText });
+      debug(`runPty exited code=${code}`);
       return { ok: true, childExitCode: code };
     } catch (e) {
       await silentRemove(dstPath);

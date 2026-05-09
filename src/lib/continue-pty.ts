@@ -13,18 +13,25 @@ export interface PtyRunSpec {
 // `prefillText` as a bracketed paste (~80ms after the first stdout chunk so
 // the Ink UI inside claude has had a chance to draw its prompt). Resolves
 // with the child's exit code.
+const debug = (s: string) => {
+  if (process.env.OPEN_CONTEXT_DEBUG) process.stderr.write(`[oc:pty] ${s}\n`);
+};
+
 export async function runPty(spec: PtyRunSpec): Promise<number> {
+  debug("import @lydell/node-pty");
   const ptyMod = await import("@lydell/node-pty");
   const cols = process.stdout.columns ?? 100;
   const rows = process.stdout.rows ?? 30;
   const env = { ...process.env, TERM: process.env.TERM ?? "xterm-256color" };
 
+  debug(`spawn claude --resume ${spec.resumeId.slice(0, 8)} cwd=${spec.cwd}`);
   const child = ptyMod.spawn("claude", ["--resume", spec.resumeId], {
     name: env.TERM,
     cols, rows,
     cwd: spec.cwd,
     env,
   });
+  debug(`spawned pid=${child.pid}`);
 
   let injected = false;
   const inject = () => {
@@ -33,11 +40,13 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
     child.write(PASTE_START + spec.prefillText + PASTE_END);
   };
 
+  let firstChunkSeen = false;
   const onData = child.onData((data) => {
+    if (!firstChunkSeen) { firstChunkSeen = true; debug(`first chunk ${data.length} bytes`); }
     process.stdout.write(data);
     if (!injected && spec.prefillText) {
       // Wait one paint after the first byte, then inject.
-      setTimeout(inject, 80);
+      setTimeout(() => { debug("inject paste"); inject(); }, 80);
     }
   });
 

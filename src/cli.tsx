@@ -31,20 +31,25 @@ Options:
 
 const { path: initialPath, emoji } = parseArgs(process.argv);
 
-let pendingContinue: ContinueRequest | null = null;
+// Mutable holder so TypeScript doesn't narrow the inner field to its initial
+// `null` value when the closure assigns into it asynchronously.
+const slot: { req: ContinueRequest | null } = { req: null };
 const inkApp = render(
   <App
     initialPath={initialPath}
     emoji={emoji}
-    onRequestContinue={(req) => { pendingContinue = req; }}
+    onRequestContinue={(req) => { slot.req = req; }}
   />,
 );
 
 await inkApp.waitUntilExit();
 
-if (pendingContinue) {
+const req = slot.req;
+if (req) {
+  if (process.env.OPEN_CONTEXT_DEBUG) process.stderr.write(`[oc] ink exited; pendingContinue set, mode=${req.launchMode}\n`);
   const { executeContinue } = await import("./lib/continue-launch.ts");
-  const result = await executeContinue(pendingContinue);
+  const result = await executeContinue(req);
+  if (process.env.OPEN_CONTEXT_DEBUG) process.stderr.write(`[oc] executeContinue returned: ${JSON.stringify(result)}\n`);
   if (!result.ok) {
     process.stderr.write(`open-context: ${result.error}\n`);
     process.exit(1);
