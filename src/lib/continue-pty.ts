@@ -54,22 +54,39 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
   }, 500);
 
   let injected = false;
-  const inject = () => {
+  const inject = (reason: string) => {
     if (injected || !spec.prefillText) return;
     injected = true;
+    debug(`inject paste (${reason})`);
     child.write(PASTE_START + spec.prefillText + PASTE_END);
   };
 
-  let firstChunkSeen = false;
+  // Inject the bracketed paste once claude's TUI looks settled. "Settled"
+  // means: no new stdout chunks for IDLE_MS, or HARD_DEADLINE_MS have elapsed
+  // since the very first chunk — whichever comes first. Either way the
+  // injection happens exactly once.
+  const IDLE_MS = 300;
+  const HARD_DEADLINE_MS = 2000;
+  let firstChunkAt = 0;
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
   let chunkCount = 0;
+
   const onData = child.onData((data) => {
     chunkCount += 1;
-    if (!firstChunkSeen) { firstChunkSeen = true; debug(`first chunk ${data.length} bytes`); }
+    if (firstChunkAt === 0) {
+      firstChunkAt = Date.now();
+      debug(`first chunk ${data.length} bytes`);
+      if (spec.prefillText) {
+        deadlineTimer = setTimeout(() => inject("hard deadline"), HARD_DEADLINE_MS);
+      }
+    }
     if (chunkCount <= 5) debug(`chunk #${chunkCount} ${data.length}b head=${JSON.stringify(data.slice(0, 40))}`);
     process.stdout.write(data);
-    if (!injected && spec.prefillText) {
-      // Wait one paint after the first byte, then inject.
-      setTimeout(() => { debug("inject paste"); inject(); }, 80);
+
+    if (spec.prefillText && !injected) {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => inject("idle"), IDLE_MS);
     }
   });
 
@@ -95,6 +112,8 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
   return await new Promise<number>((resolve) => {
     const onExitDisposable = child.onExit(({ exitCode, signal }) => {
       debug(`child exit code=${exitCode} signal=${signal ?? "none"}`);
+      if (idleTimer) clearTimeout(idleTimer);
+      if (deadlineTimer) clearTimeout(deadlineTimer);
       onData.dispose();
       onExitDisposable.dispose();
       process.stdin.off("data", onStdin);
