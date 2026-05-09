@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs/promises";
+import os from "node:os";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import process from "node:process";
@@ -7,7 +8,7 @@ import type { ContinueRequest } from "./continue-types.ts";
 import { forkSession } from "./continue-fork.ts";
 import { runPty } from "./continue-pty.ts";
 import { spawnNewWindow } from "./continue-spawn.ts";
-import { decodeProjectPath } from "./decode-project-path.ts";
+import { decodeProjectPath, encodeProjectPath } from "./decode-project-path.ts";
 import { trace } from "./debug-trace.ts";
 
 export interface ContinueResult {
@@ -35,12 +36,21 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
     return { ok: false, error: "\"new window\" mode is only supported on macOS" };
   }
 
+  // Resolve launch cwd first — claude's --resume looks for the JSONL under
+  // `~/.claude/projects/<encode(cwd)>/<id>.jsonl`, so the fork has to land
+  // there, not next to the source. In force mode the cwd is the user's
+  // current dir (set by the caller); otherwise we decode from the source
+  // slug and fall back to process.cwd() if missing.
+  const cwd = req.forceCwd ?? (await detectProjectCwd(req.sourcePath));
+  trace("launch", `cwd=${cwd}`);
+
   const newUuid = randomUUID();
-  const dir = path.dirname(req.sourcePath);
-  const dstPath = path.join(dir, `${newUuid}.jsonl`);
-  trace("launch", `fork → ${dstPath}${req.forceCwd ? ` (force cwd=${req.forceCwd})` : ""}`);
+  const dstDir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(cwd));
+  const dstPath = path.join(dstDir, `${newUuid}.jsonl`);
+  trace("launch", `fork → ${dstPath}${req.forceCwd ? " (force)" : ""}`);
 
   try {
+    await fs.mkdir(dstDir, { recursive: true });
     await forkSession({
       srcPath: req.sourcePath,
       dstPath,
@@ -54,11 +64,6 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
     return { ok: false, error: `failed to fork session: ${(e as Error).message}` };
   }
   trace("launch", "fork ok");
-
-  // forceCwd skips detection: the user has explicitly chosen the launch dir
-  // because the original is missing.
-  const cwd = req.forceCwd ?? (await detectProjectCwd(req.sourcePath));
-  trace("launch", `cwd=${cwd}`);
 
   if (req.launchMode === "reuse-current") {
     trace("launch", "runPty starting");

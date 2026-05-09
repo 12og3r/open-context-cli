@@ -8,3 +8,12 @@ export function decodeProjectPath(encoded: string): string {
   if (!encoded.startsWith("-")) return "";
   return encoded.replace(/-/g, "/");
 }
+
+/**
+ * Inverse of decodeProjectPath. Used by the continue-conversation launcher
+ * to figure out which `~/.claude/projects/<slug>/` directory claude will
+ * look in when resuming, given the cwd we're going to launch into.
+ */
+export function encodeProjectPath(absPath: string): string {
+  return absPath.replace(/\//g, "-");
+}
