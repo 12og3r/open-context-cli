@@ -74,6 +74,32 @@ describe("ClaudeCodeProvider.listSessions", () => {
     // user + assistant (the tool_result is wrapped in a user line per Claude Code)
     expect(tools.messageCount).toBe(3);
   });
+
+  test("captures cwd from the first user/assistant entry", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "cwd-fixture-"));
+    const slugDir = path.join(root, "-Users-roger-projects-context-cli");
+    await fs.mkdir(slugDir, { recursive: true });
+    const jsonl = [
+      JSON.stringify({ type: "summary", summary: "test" }),
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        cwd: "/Users/roger/projects/context-cli",
+        message: { content: "hi" },
+        timestamp: "2026-01-01T00:00:00Z",
+      }),
+    ].join("\n") + "\n";
+    await fs.writeFile(path.join(slugDir, "abc-def.jsonl"), jsonl);
+    const list = await new ClaudeCodeProvider().listSessions(root);
+    expect(list[0]?.cwd).toBe("/Users/roger/projects/context-cli");
+  });
+
+  test("cwd is undefined when entries lack the field (backward compat)", async () => {
+    const root = await makeRoot();
+    const list = await new ClaudeCodeProvider().listSessions(root);
+    // Existing fixtures don't carry cwd, so undefined is the expected shape.
+    expect(list.every(m => m.cwd === undefined)).toBe(true);
+  });
 });
 
 async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {

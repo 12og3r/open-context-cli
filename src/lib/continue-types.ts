@@ -11,6 +11,10 @@ export interface ContinueRequest {
   userText?: string;
   // Resolved at request time so cli.tsx doesn't need to re-read settings.
   launchMode: ContinueLaunchMode;
+  // The session's recorded cwd from the source JSONL — preferred over
+  // decoding the slug, which is lossy. Used as the launch cwd when force
+  // mode is off.
+  sourceCwd?: string;
   // Force mode: when set, the original project directory was missing and
   // the user asked to launch in this cwd instead. The launcher uses this
   // path as both the spawn cwd and as the value rewritten into every

@@ -353,14 +353,19 @@ export function SessionBrowser({
                       return { ok: false, error: t(lang, "continue.error_source_missing") };
                     }
 
+                    // Prefer the cwd recorded inside the JSONL (unambiguous);
+                    // fall back to decoding the slug if older sessions don't
+                    // have one captured. The slug-based decode is lossy when
+                    // a directory name contains "-".
+                    const slug = path.basename(path.dirname(selected.filePath));
+                    const sessionCwd = selected.cwd || decodeProjectPath(slug);
+
                     // Project directory missing: recoverable. First confirm
                     // returns recoverable=force-cwd so preview can offer
                     // (force); the next confirm arrives with info.force=true
                     // and we launch in process.cwd() instead.
                     let forceCwd: string | undefined;
-                    const slug = path.basename(path.dirname(selected.filePath));
-                    const decodedCwd = decodeProjectPath(slug);
-                    if (decodedCwd && !fsSync.existsSync(decodedCwd)) {
+                    if (sessionCwd && !fsSync.existsSync(sessionCwd)) {
                       if (!info.force) {
                         return {
                           ok: false,
@@ -386,6 +391,7 @@ export function SessionBrowser({
                       targetRole: info.targetRole,
                       userText: info.userText,
                       launchMode: settings.continueLaunchMode,
+                      sourceCwd: sessionCwd || undefined,
                       forceCwd,
                     });
                     return { ok: true };

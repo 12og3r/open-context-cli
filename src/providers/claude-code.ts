@@ -129,6 +129,7 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
   let firstUserText = "";
   let firstTaskSubject = "";
   let messageCount = 0;
+  let recordedCwd = "";
 
   const rl = readline.createInterface({
     input: createReadStream(filePath, { encoding: "utf-8" }),
@@ -151,6 +152,12 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
       if (!firstTaskSubject && type === "assistant") {
         firstTaskSubject = extractFirstTaskSubject(entry);
       }
+      // Capture the recorded cwd from the first user/assistant entry. This
+      // is the unambiguous truth — decoding the slug back to a path is lossy
+      // whenever a directory name contains "-".
+      if (!recordedCwd && typeof entry.cwd === "string" && entry.cwd) {
+        recordedCwd = entry.cwd;
+      }
     }
     if (typeof entry.slug === "string" && entry.slug) latestSlug = entry.slug;
   }
@@ -169,6 +176,7 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
     projectPath,
     modifiedAt: stat.mtime,
     messageCount,
+    cwd: recordedCwd || undefined,
   };
 }
 

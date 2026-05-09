@@ -38,10 +38,9 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
 
   // Resolve launch cwd first — claude's --resume looks for the JSONL under
   // `~/.claude/projects/<encode(cwd)>/<id>.jsonl`, so the fork has to land
-  // there, not next to the source. In force mode the cwd is the user's
-  // current dir (set by the caller); otherwise we decode from the source
-  // slug and fall back to process.cwd() if missing.
-  const cwd = req.forceCwd ?? (await detectProjectCwd(req.sourcePath));
+  // there, not next to the source. Priority: forceCwd (user override) >
+  // sourceCwd (recorded in JSONL, unambiguous) > slug decode + fallback.
+  const cwd = req.forceCwd ?? req.sourceCwd ?? (await detectProjectCwd(req.sourcePath));
   trace("launch", `cwd=${cwd}`);
 
   const newUuid = randomUUID();

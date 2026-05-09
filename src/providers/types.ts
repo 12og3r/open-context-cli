@@ -19,6 +19,9 @@ export interface SessionMeta {
   projectPath: string;   // decoded from parent dir; "" when not derivable
   modifiedAt: Date;
   messageCount: number;  // count of user+assistant lines (other types don't count)
+  cwd?: string;          // exact cwd from the first user/assistant entry's
+                         // `cwd` field — preferred over decoding the slug,
+                         // which is lossy when path segments contain "-".
 }
 
 export interface SessionProvider {
