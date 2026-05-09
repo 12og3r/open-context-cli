@@ -46,8 +46,8 @@ describe("SessionPreview", () => {
     );
     await tick();
     const out = lastFrame() ?? "";
-    expect(out).toContain("0123456");        // first 7 of sessionId
-    expect(out).toContain("msg abcdef0");    // first 7 of message uuid
+    expect(out).toContain("session 0123456");  // session prefix + first 7 of sessionId
+    expect(out).toContain("msg abcdef0");       // first 7 of message uuid
   });
 
   test("showHash off keeps the footer free of hash markers", async () => {

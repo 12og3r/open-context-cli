@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import type { Settings, DisplayMode } from "../lib/settings.ts";
+import { t, type Lang } from "../lib/i18n.ts";
+import { useLang } from "../hooks/use-lang.ts";
 
 const ACCENT = "cyan";
 
@@ -12,40 +14,58 @@ type FieldDef = {
   };
 }[keyof Settings];
 
-const FIELDS: FieldDef[] = [
-  {
-    key: "displayMode",
-    title: "Display mode",
-    options: [
-      {
-        value: "concise",
-        label: "Concise",
-        description: "Show only user and assistant messages.",
-      },
-      {
-        value: "full",
-        label: "Full",
-        description: "Show every message, including tool calls and results.",
-      },
-    ],
-  },
-  {
-    key: "showHash",
-    title: "Show hash",
-    options: [
-      {
-        value: true,
-        label: "On",
-        description: "Show sessionId and the current message's uuid in the preview footer.",
-      },
-      {
-        value: false,
-        label: "Off",
-        description: "Hide hash values in the preview footer.",
-      },
-    ],
-  },
-];
+function buildFields(lang: Lang): FieldDef[] {
+  return [
+    {
+      key: "displayMode",
+      title: t(lang, "settings.display_mode.title"),
+      options: [
+        {
+          value: "concise",
+          label: t(lang, "settings.display_mode.concise"),
+          description: t(lang, "settings.display_mode.concise_desc"),
+        },
+        {
+          value: "full",
+          label: t(lang, "settings.display_mode.full"),
+          description: t(lang, "settings.display_mode.full_desc"),
+        },
+      ],
+    },
+    {
+      key: "showHash",
+      title: t(lang, "settings.show_hash.title"),
+      options: [
+        {
+          value: true,
+          label: t(lang, "settings.show_hash.on"),
+          description: t(lang, "settings.show_hash.on_desc"),
+        },
+        {
+          value: false,
+          label: t(lang, "settings.show_hash.off"),
+          description: t(lang, "settings.show_hash.off_desc"),
+        },
+      ],
+    },
+    {
+      key: "language",
+      title: t(lang, "settings.language.title"),
+      options: [
+        {
+          value: "en",
+          label: t(lang, "settings.language.en"),
+          description: t(lang, "settings.language.en_desc"),
+        },
+        {
+          value: "zh",
+          label: t(lang, "settings.language.zh"),
+          description: t(lang, "settings.language.zh_desc"),
+        },
+      ],
+    },
+  ];
+}
 
 export function SettingsPanel({
   settings,
@@ -60,20 +80,22 @@ export function SettingsPanel({
   width: number;
   height: number;
 }) {
+  const lang = useLang();
+  const FIELDS = useMemo(() => buildFields(lang), [lang]);
   const [fieldIdx, setFieldIdx] = useState(0);
   // Per-field "option cursor" — independent of the applied value. Initialized
   // to the applied option when this panel first opens (or settings hydrate).
   // ←/→ moves this cursor; Space applies cursor → settings.
   const [optionCursor, setOptionCursor] = useState<Record<string, number>>(() =>
-    initialCursor(settings),
+    initialCursor(FIELDS, settings),
   );
 
   // When the panel becomes focused, re-anchor the cursor on each field to
   // whatever value is currently applied. That way leaving and re-entering the
   // panel doesn't leave a stale cursor on a value the user never confirmed.
   useEffect(() => {
-    if (focused) setOptionCursor(initialCursor(settings));
-  }, [focused, settings]);
+    if (focused) setOptionCursor(initialCursor(FIELDS, settings));
+  }, [focused, settings, FIELDS]);
 
   const field = FIELDS[fieldIdx]!;
 
@@ -116,9 +138,7 @@ export function SettingsPanel({
   return (
     <Box flexDirection="column" width={width} height={height}>
       <Box flexShrink={0} marginBottom={1}>
-        <Text dimColor>
-          ↑↓ field · ←→ move cursor · space to apply · ⏎ confirm · esc back
-        </Text>
+        <Text dimColor>{t(lang, "settings.help")}</Text>
       </Box>
       {FIELDS.map((f, i) => {
         const fieldSelected = i === fieldIdx;
@@ -177,9 +197,9 @@ function Option({ label, applied, cursor }: { label: string; applied: boolean; c
   );
 }
 
-function initialCursor(settings: Settings): Record<string, number> {
+function initialCursor(fields: FieldDef[], settings: Settings): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const f of FIELDS) {
+  for (const f of fields) {
     const i = f.options.findIndex(o => o.value === settings[f.key]);
     out[f.key] = i >= 0 ? i : 0;
   }

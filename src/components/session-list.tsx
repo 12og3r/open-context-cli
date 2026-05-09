@@ -3,6 +3,8 @@ import { Box, Text } from "ink";
 import type { SessionMeta } from "../providers/types.ts";
 import { relativeTime } from "../lib/relative-time.ts";
 import { truncate } from "../lib/truncate.ts";
+import { t } from "../lib/i18n.ts";
+import { useLang } from "../hooks/use-lang.ts";
 
 const ROWS_PER_ITEM = 2;
 const ROWS_PER_GAP = 1;
@@ -25,6 +27,7 @@ export function SessionList({
   height?: number;
   now?: Date;
 }) {
+  const lang = useLang();
   const innerWidth = Math.max(1, width);
   const visible = windowSessions(sessions, selectedId, height);
 
@@ -32,7 +35,7 @@ export function SessionList({
     <Box flexDirection="column" width={width} flexShrink={0}>
       {visible.map((s, i) => (
         <Box key={s.id} flexDirection="column" flexShrink={0}>
-          <Item meta={s} selected={s.id === selectedId} innerWidth={innerWidth} now={now} />
+          <Item meta={s} selected={s.id === selectedId} innerWidth={innerWidth} now={now} lang={lang} />
           {i < visible.length - 1 && <Box height={1} flexShrink={0} />}
         </Box>
       ))}
@@ -58,15 +61,16 @@ function windowSessions(
   return sessions.slice(start, end);
 }
 
-function Item({ meta, selected, innerWidth, now }: {
+function Item({ meta, selected, innerWidth, now, lang }: {
   meta: SessionMeta;
   selected: boolean;
   innerWidth: number;
   now: Date;
+  lang: import("../lib/i18n.ts").Lang;
 }) {
   const marker = selected ? SELECTED_MARKER : UNSELECTED_MARKER;
   const summary = truncate(meta.summary, innerWidth - MARKER_WIDTH);
-  const meta2 = `  ${relativeTime(meta.modifiedAt, now)}  ·  ${meta.messageCount} msgs`;
+  const meta2 = `  ${relativeTime(meta.modifiedAt, now, lang)}  ·  ${meta.messageCount} ${t(lang, "list.msgs_suffix")}`;
   return (
     <Box flexDirection="column" flexShrink={0}>
       <Text>

@@ -4,6 +4,8 @@ import { Box, Text } from "ink";
 import type { Message, Role } from "../providers/types.ts";
 import { localTimeOfDay, relativeTime } from "../lib/relative-time.ts";
 import { markdownToAnsi } from "../lib/markdown-ansi.ts";
+import { useLang } from "../hooks/use-lang.ts";
+import { t, type Lang } from "../lib/i18n.ts";
 
 const ROLE_EMOJI: Record<Role, string> = {
   user: "👨",
@@ -34,8 +36,9 @@ export function MessageBlock({
   current?: boolean;
   now?: Date;
 }) {
-  const headerLabel = headerFor(message);
-  const time = relativeTime(message.timestamp, now);
+  const lang = useLang();
+  const headerLabel = headerFor(message, lang);
+  const time = relativeTime(message.timestamp, now, lang);
   const clock = localTimeOfDay(message.timestamp);
   const headerText = `${emoji ? ROLE_EMOJI[message.role] + " " : ""}${headerLabel}`;
   const color = ROLE_COLOR[message.role];
@@ -63,23 +66,26 @@ export function MessageBlock({
   );
 }
 
-function headerFor(m: Message): string {
+function headerFor(m: Message, lang: Lang): string {
   switch (m.role) {
-    case "tool_use": return `${m.toolName ?? "tool"}`;
-    case "tool_result": return `result`;
-    default: return m.role;
+    case "tool_use": return m.toolName ?? t(lang, "role.tool");
+    case "tool_result": return t(lang, "role.tool_result");
+    default: return t(lang, `role.${m.role}`);
   }
 }
 
 function Body({ message, expanded }: { message: Message; expanded: boolean }) {
   if (message.role === "tool_use" || message.role === "tool_result") {
-    if (!expanded) {
-      const oneLine = (message.content || "").split("\n")[0] ?? "";
-      const lineCount = (message.content || "").split("\n").length;
-      const tail = lineCount > 1 ? `  (${lineCount} lines)` : "";
-      return <Text dimColor wrap="truncate">{`▸ ${oneLine}${tail}`}</Text>;
+    const content = message.content || "";
+    const lines = content.split("\n");
+    const lineCount = lines.length;
+    if (lineCount <= 1) {
+      return <Text dimColor wrap="truncate">{content}</Text>;
     }
-    return <Text dimColor>{message.content}</Text>;
+    if (!expanded) {
+      return <Text dimColor wrap="truncate">{`▸ ${lines[0] ?? ""}  (${lineCount} lines)`}</Text>;
+    }
+    return <Text dimColor>{`▾ ${content}`}</Text>;
   }
   if (message.role === "system") {
     return <Text dimColor italic>{message.content}</Text>;

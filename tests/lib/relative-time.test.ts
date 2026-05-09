@@ -37,6 +37,28 @@ describe("relativeTime", () => {
   });
 });
 
+describe("relativeTime · zh", () => {
+  test("under a minute → 刚刚", () => {
+    expect(relativeTime(new Date("2026-05-07T11:59:30Z"), NOW, "zh")).toBe("刚刚");
+  });
+
+  test("minutes ago", () => {
+    expect(relativeTime(new Date("2026-05-07T11:45:00Z"), NOW, "zh")).toBe("15 分钟前");
+  });
+
+  test("hours ago", () => {
+    expect(relativeTime(new Date("2026-05-07T10:00:00Z"), NOW, "zh")).toBe("2 小时前");
+  });
+
+  test("yesterday", () => {
+    expect(relativeTime(new Date("2026-05-06T23:00:00Z"), NOW, "zh")).toBe("昨天");
+  });
+
+  test("days ago", () => {
+    expect(relativeTime(new Date("2026-05-04T12:00:00Z"), NOW, "zh")).toBe("3 天前");
+  });
+});
+
 describe("localTimeOfDay", () => {
   test("formats hours and minutes with zero-padding in the local timezone", () => {
     // Build the date from local components so the test is timezone-independent:

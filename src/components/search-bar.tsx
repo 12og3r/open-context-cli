@@ -2,6 +2,8 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { MinimalInput } from "./minimal-input.tsx";
+import { t } from "../lib/i18n.ts";
+import { useLang } from "../hooks/use-lang.ts";
 
 export function SearchBar({
   value,
@@ -30,10 +32,11 @@ export function SearchBar({
   // and which match is current.
   readOnly?: boolean;
 }) {
+  const lang = useLang();
   const showCounter = matchCount >= 0;
   const hasQuery = value.length > 0;
   const zero = showCounter && hasQuery && matchCount === 0;
-  const label = matchCount < 0 ? " FILTER " : " SEARCH ";
+  const label = matchCount < 0 ? ` ${t(lang, "filter.label")} ` : ` ${t(lang, "search.label")} `;
   const pillBg = zero ? "red" : "cyan";
 
   return (
@@ -58,7 +61,7 @@ export function SearchBar({
       {showCounter && hasQuery && (
         <Box marginLeft={2}>
           {zero ? (
-            <Text color="red" bold>no matches</Text>
+            <Text color="red" bold>{t(lang, "search.no_matches")}</Text>
           ) : (
             <Text dimColor>{matchIndex + 1} / {matchCount}</Text>
           )}

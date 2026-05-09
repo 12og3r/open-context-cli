@@ -9,6 +9,9 @@ import { getProvider } from "./providers/index.ts";
 import type { SessionMeta } from "./providers/types.ts";
 import { PathInput } from "./components/path-input.tsx";
 import { SessionBrowser } from "./components/session-browser.tsx";
+import { LangProvider } from "./hooks/use-lang.ts";
+import { useSettings } from "./hooks/use-settings.ts";
+import { t } from "./lib/i18n.ts";
 
 type AppState =
   | { kind: "scanning"; root: string }
@@ -24,6 +27,8 @@ export function App({
 }) {
   const provider = useMemo(() => getProvider(), []);
   const { exit } = useApp();
+  const { settings, update: updateSetting } = useSettings();
+  const lang = settings.language;
   const [state, setState] = useState<AppState>(() => {
     const root = initialPath ?? provider.defaultPaths[0]!;
     return { kind: "scanning", root: expandHome(root) };
@@ -58,31 +63,45 @@ export function App({
 
   if (state.kind === "scanning") {
     return (
-      <Box>
-        <Spinner /><Text> Scanning {state.root}…</Text>
-      </Box>
+      <LangProvider value={lang}>
+        <Box>
+          <Spinner /><Text> {t(lang, "loading.scanning", { root: state.root })}</Text>
+        </Box>
+      </LangProvider>
     );
   }
   if (state.kind === "path-input") {
     return (
-      <PathInput
-        reason={state.reason}
-        error={state.error}
-        onSubmit={(p) => {
-          const root = expandHome(p);
-          setState({ kind: "scanning", root });
-        }}
-      />
+      <LangProvider value={lang}>
+        <PathInput
+          reason={state.reason}
+          error={state.error}
+          onSubmit={(p) => {
+            const root = expandHome(p);
+            setState({ kind: "scanning", root });
+          }}
+        />
+      </LangProvider>
     );
   }
   return (
-    <SessionBrowser
-      provider={provider}
-      sessions={state.sessions}
-      emoji={emoji}
-      onRequestPathInput={() => setState({ kind: "path-input", reason: "user-requested" })}
-      onQuit={() => exit()}
-    />
+    <LangProvider value={lang}>
+      <SessionBrowser
+        provider={provider}
+        sessions={state.sessions}
+        emoji={emoji}
+        settings={settings}
+        updateSetting={updateSetting}
+        onRequestPathInput={() => setState({ kind: "path-input", reason: "user-requested" })}
+        onQuit={() => exit()}
+        onSessionRemoved={(id) => {
+          setState(prev => {
+            if (prev.kind !== "browser") return prev;
+            return { ...prev, sessions: prev.sessions.filter(s => s.id !== id) };
+          });
+        }}
+      />
+    </LangProvider>
   );
 }
 

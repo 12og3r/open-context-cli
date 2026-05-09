@@ -1,17 +1,20 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { DEFAULT_LANG, LANGS, type Lang } from "./i18n.ts";
 
 export type DisplayMode = "concise" | "full";
 
 export interface Settings {
   displayMode: DisplayMode;
   showHash: boolean;
+  language: Lang;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   displayMode: "full",
   showHash: true,
+  language: DEFAULT_LANG,
 };
 
 export function settingsDir(): string {
@@ -53,6 +56,9 @@ function sanitize(p: Partial<Settings>): Partial<Settings> {
   }
   if (typeof p.showHash === "boolean") {
     out.showHash = p.showHash;
+  }
+  if (typeof p.language === "string" && (LANGS as readonly string[]).includes(p.language)) {
+    out.language = p.language as Lang;
   }
   return out;
 }

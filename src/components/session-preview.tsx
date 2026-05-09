@@ -10,6 +10,8 @@ import {
 } from "../lib/render-message.ts";
 import { SearchBar } from "./search-bar.tsx";
 import type { Match } from "../lib/matches.ts";
+import { t } from "../lib/i18n.ts";
+import { useLang } from "../hooks/use-lang.ts";
 
 const EMPTY_BUFFER: ConversationBuffer = { lines: [], startLine: [], endLine: [], matches: [] };
 
@@ -30,6 +32,7 @@ export function SessionPreview({
   emoji?: boolean;
   showHash?: boolean;
 }) {
+  const lang = useLang();
   // pinToBottom: while true, the viewport sticks to the latest message and the
   //   cursor sits on lastIdx automatically. Any j/k/g/PgUp/PgDn unpins.
   const [pinToBottom, setPinToBottom] = useState(true);
@@ -95,7 +98,7 @@ export function SessionPreview({
       try {
         const result = await renderConversationAsync(
           messages,
-          { width, expanded, emoji, now: new Date(), query, matchIndex },
+          { width, expanded, emoji, now: new Date(), query, matchIndex, lang },
           () => cancelled,
         );
         if (cancelled) return;
@@ -106,7 +109,7 @@ export function SessionPreview({
       }
     })();
     return () => { cancelled = true; };
-  }, [messages, width, expanded, emoji, query, matchIndex]);
+  }, [messages, width, expanded, emoji, query, matchIndex, lang]);
 
   const matches = buffer.matches;
   const matchCount = matches.length;
@@ -355,7 +358,7 @@ export function SessionPreview({
   if (messages.length === 0) {
     return (
       <Box width={width} height={height} alignItems="center" justifyContent="center">
-        <Text dimColor>(no messages)</Text>
+        <Text dimColor>{t(lang, "empty.messages")}</Text>
       </Box>
     );
   }
@@ -367,7 +370,7 @@ export function SessionPreview({
       <Box width={width} height={height} alignItems="center" justifyContent="center">
         <Box>
           <Text color="cyan"><Spinner /></Text>
-          <Text dimColor> rendering…</Text>
+          <Text dimColor> {t(lang, "loading.rendering")}</Text>
         </Box>
       </Box>
     );
@@ -435,7 +438,7 @@ export function SessionPreview({
             {effectiveCursor + 1} / {messages.length}
             {hasBelow ? "  ↓" : "   "}
             {showHash && (sessionHash7(sessionId) || msgHash7(messages[effectiveCursor]))
-              ? `  ·  ${formatHashes(sessionId, messages[effectiveCursor])}`
+              ? `  ·  ${formatHashes(sessionId, messages[effectiveCursor], lang)}`
               : ""}
           </Text>
         </Box>
@@ -459,11 +462,15 @@ function msgHash7(message: Message | undefined): string {
   return shortHash(message?.uuid);
 }
 
-function formatHashes(sessionId: string | null, message: Message | undefined): string {
+function formatHashes(sessionId: string | null, message: Message | undefined, lang: import("../lib/i18n.ts").Lang): string {
   const sess = sessionHash7(sessionId);
   const msg = msgHash7(message);
-  if (sess && msg) return `${sess}  ·  msg ${msg}`;
-  return sess || (msg ? `msg ${msg}` : "");
+  const sessPrefix = t(lang, "preview.session_hash_prefix");
+  const msgPrefix = t(lang, "preview.msg_hash_prefix");
+  const sessPart = sess ? `${sessPrefix} ${sess}` : "";
+  const msgPart = msg ? `${msgPrefix} ${msg}` : "";
+  if (sessPart && msgPart) return `${sessPart}  ·  ${msgPart}`;
+  return sessPart || msgPart;
 }
 
 function clampToRange(n: number, lo: number, hi: number): number {

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import fs from "node:fs/promises";
 import { Box, Text, useInput, useStdout } from "ink";
 import Spinner from "ink-spinner";
 import type { SessionMeta, SessionProvider } from "../providers/types.ts";
@@ -8,32 +9,47 @@ import { SearchBar } from "./search-bar.tsx";
 import { Footer, type FooterContext } from "./footer.tsx";
 import { FeatureBar, type FeatureItem } from "./feature-bar.tsx";
 import { SettingsPanel, applyDisplayMode } from "./settings-panel.tsx";
+import { DeleteConfirm, type DeleteChoice } from "./delete-confirm.tsx";
 import { useSessionDetail } from "../hooks/use-session-detail.ts";
-import { useSettings } from "../hooks/use-settings.ts";
+import type { Settings } from "../lib/settings.ts";
+import { useLang } from "../hooks/use-lang.ts";
+import { t } from "../lib/i18n.ts";
 
 const ACCENT = "cyan";
+const DANGER = "red";
 const MUTED = "gray";
 
-type Focus = "list" | "preview" | "feature-bar" | "settings";
-type RightView = "preview" | "settings";
-
-const FEATURES: FeatureItem[] = [
-  { id: "settings", label: "Settings", icon: "⚙" },
-];
+type Focus = "list" | "preview" | "feature-bar" | "settings" | "delete-confirm";
+type RightView = "preview" | "settings" | "delete-confirm";
 
 export function SessionBrowser({
   provider,
   sessions,
   emoji,
+  settings,
+  updateSetting,
   onRequestPathInput,
   onQuit,
+  onSessionRemoved,
 }: {
   provider: SessionProvider;
   sessions: SessionMeta[];
   emoji: boolean;
+  settings: Settings;
+  updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   onRequestPathInput: () => void;
   onQuit: () => void;
+  onSessionRemoved?: (id: string) => void;
 }) {
+  const lang = useLang();
+  // Width-stable Unicode icons (each 1 cell across all major terminals).
+  // Avoid emoji (⚙ / 🗑) — string-width reports them as 1 cell but most
+  // terminals render them as 2, which would misalign the left pane's right
+  // border with the right pane's left border on this row.
+  const FEATURES: FeatureItem[] = [
+    { id: "settings", label: t(lang, "feature.settings"), icon: "≡" },
+    { id: "delete", label: t(lang, "feature.delete"), icon: "×" },
+  ];
   const { stdout } = useStdout();
   const termWidth = stdout?.columns ?? 100;
   const termHeight = stdout?.rows ?? 30;
@@ -49,7 +65,13 @@ export function SessionBrowser({
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [featureIdx, setFeatureIdx] = useState(0);
 
-  const { settings, update: updateSetting } = useSettings();
+  // Delete-confirm dialog state. `target` is the session pinned at the moment
+  // the user opened the dialog; we hold it locally so the visible "Delete this
+  // session?" text doesn't shift if the list re-orders or the cursor moves.
+  const [deleteTarget, setDeleteTarget] = useState<SessionMeta | null>(null);
+  const [deleteCursor, setDeleteCursor] = useState<DeleteChoice>("cancel");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     if (!committedFilter) return sessions;
@@ -105,6 +127,13 @@ export function SessionBrowser({
         if (f?.id === "settings") {
           setRightView("settings");
           setFocus("settings");
+        } else if (f?.id === "delete") {
+          if (!selected) return;
+          setDeleteTarget(selected);
+          setDeleteCursor("cancel");
+          setDeleteError(null);
+          setRightView("delete-confirm");
+          setFocus("delete-confirm");
         }
       }
       return;
@@ -125,15 +154,64 @@ export function SessionBrowser({
       }
       // arrow / space handling lives inside SettingsPanel
     }
+
+    if (focus === "delete-confirm") {
+      if (deleteBusy) return;
+      if (key.escape) { closeDeleteDialog(); return; }
+      if (key.leftArrow || input === "h") setDeleteCursor("cancel");
+      else if (key.rightArrow || input === "l") setDeleteCursor("delete");
+      else if (key.return) {
+        if (deleteCursor === "cancel" || !deleteTarget) {
+          closeDeleteDialog();
+        } else {
+          void confirmDelete(deleteTarget);
+        }
+      }
+      return;
+    }
   });
+
+  function closeDeleteDialog() {
+    setRightView("preview");
+    setFocus("feature-bar");
+    setDeleteTarget(null);
+    setDeleteError(null);
+    setDeleteBusy(false);
+  }
+
+  async function confirmDelete(target: SessionMeta) {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await fs.unlink(target.filePath);
+    } catch (err: unknown) {
+      setDeleteBusy(false);
+      setDeleteError((err as Error).message || "delete failed");
+      return;
+    }
+    // Selection follows the same index — sessions shift up by one on removal,
+    // so the next session naturally takes the slot. Clamp at the new end.
+    const removingFiltered = filtered.findIndex(s => s.id === target.id);
+    if (removingFiltered >= 0) {
+      const newLen = filtered.length - 1;
+      setSelectedIdx(prev => Math.min(prev, Math.max(0, newLen - 1)));
+    }
+    onSessionRemoved?.(target.id);
+    setDeleteBusy(false);
+    setDeleteTarget(null);
+    setRightView("preview");
+    setFocus("list");
+  }
 
   const footerContext: FooterContext = searchOpen
     ? "list-search"
     : focus === "settings"
       ? "settings"
-      : focus === "feature-bar"
-        ? "feature-bar"
-        : focus;
+      : focus === "delete-confirm"
+        ? "delete-confirm"
+        : focus === "feature-bar"
+          ? "feature-bar"
+          : focus;
 
   const listFocused = focus === "list";
   const previewFocused = focus === "preview";
@@ -156,7 +234,7 @@ export function SessionBrowser({
           width={leftWidth}
           focused={listFocused || focus === "feature-bar"}
           accent={listFocused ? ACCENT : focus === "feature-bar" ? ACCENT : MUTED}
-          title={searchOpen ? "FILTER" : "SESSIONS"}
+          title={searchOpen ? t(lang, "title.filter") : t(lang, "title.sessions")}
           meta={searchOpen ? "" : `${filtered.length}`}
         >
           {searchOpen ? (
@@ -179,7 +257,7 @@ export function SessionBrowser({
               height={listHeight}
             />
             {filtered.length === 0 && !searchOpen && (
-              <Text dimColor>(no sessions)</Text>
+              <Text dimColor>{t(lang, "empty.sessions")}</Text>
             )}
           </Box>
           <FeatureBar
@@ -191,11 +269,25 @@ export function SessionBrowser({
         </Pane>
         <Pane
           width={rightWidth}
-          focused={previewFocused || focus === "settings"}
-          accent={previewFocused ? ACCENT : focus === "settings" ? ACCENT : MUTED}
-          title={rightView === "settings" ? "SETTINGS" : "PREVIEW"}
-          meta={
+          focused={previewFocused || focus === "settings" || focus === "delete-confirm"}
+          accent={
+            previewFocused
+              ? ACCENT
+              : focus === "settings"
+                ? ACCENT
+                : focus === "delete-confirm"
+                  ? DANGER
+                  : MUTED
+          }
+          title={
             rightView === "settings"
+              ? t(lang, "title.settings")
+              : rightView === "delete-confirm"
+                ? t(lang, "title.delete")
+                : t(lang, "title.preview")
+          }
+          meta={
+            rightView === "settings" || rightView === "delete-confirm"
               ? ""
               : selected
                 ? truncateProject(selected.projectPath, rightInnerWidth - 16)
@@ -210,12 +302,21 @@ export function SessionBrowser({
               width={rightInnerWidth}
               height={innerHeight}
             />
+          ) : rightView === "delete-confirm" && deleteTarget ? (
+            <DeleteConfirm
+              session={deleteTarget}
+              cursor={deleteCursor}
+              busy={deleteBusy}
+              error={deleteError}
+              width={rightInnerWidth}
+              height={innerHeight}
+            />
           ) : (
             <>
               {detail.status === "loading" && (
                 <Box>
                   <Text color={ACCENT}><Spinner /></Text>
-                  <Text dimColor> loading messages…</Text>
+                  <Text dimColor> {t(lang, "loading.messages")}</Text>
                 </Box>
               )}
               {detail.status === "error" && (

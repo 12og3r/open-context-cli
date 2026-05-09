@@ -2,6 +2,7 @@ import wrapAnsi from "wrap-ansi";
 import type { Message, Role } from "../providers/types.ts";
 import { markdownToAnsi } from "./markdown-ansi.ts";
 import { findMatches, type Match } from "./matches.ts";
+import { DEFAULT_LANG, t, type Lang } from "./i18n.ts";
 import { localTimeOfDay, relativeTime } from "./relative-time.ts";
 import { truncate } from "./truncate.ts";
 
@@ -34,11 +35,11 @@ function isPrimary(role: Role): boolean {
   return role === "user" || role === "assistant";
 }
 
-function headerLabel(m: Message): string {
+function headerLabel(m: Message, lang: Lang): string {
   switch (m.role) {
-    case "tool_use": return m.toolName ?? "tool";
-    case "tool_result": return "result";
-    default: return m.role;
+    case "tool_use": return m.toolName ?? t(lang, "role.tool");
+    case "tool_result": return t(lang, "role.tool_result");
+    default: return t(lang, `role.${m.role}`);
   }
 }
 
@@ -48,6 +49,7 @@ export type RenderMessageOpts = {
   expanded: boolean;
   emoji: boolean;
   now: Date;
+  lang?: Lang;
 };
 
 /**
@@ -57,7 +59,7 @@ export type RenderMessageOpts = {
  * adjacent messages are separated by visible space.
  */
 export function renderMessageLines(message: Message, opts: RenderMessageOpts): string[] {
-  const { width, current, expanded, emoji, now } = opts;
+  const { width, current, expanded, emoji, now, lang = DEFAULT_LANG } = opts;
   const out: string[] = [];
 
   const fg = ROLE_FG[message.role];
@@ -66,12 +68,12 @@ export function renderMessageLines(message: Message, opts: RenderMessageOpts): s
 
   const cursorMark = current ? `${FG_CYAN}${BOLD}› ${RESET}` : "  ";
   const bar = `${fg}${primary ? BOLD : ""}▍ ${RESET}`;
-  const labelText = `${emoji ? ROLE_EMOJI[message.role] + " " : ""}${headerLabel(message)}`;
+  const labelText = `${emoji ? ROLE_EMOJI[message.role] + " " : ""}${headerLabel(message, lang)}`;
   let labelStyle = fg;
   if (primary || current) labelStyle += BOLD;
   if (message.role === "system") labelStyle += ITALIC;
   if (muted) labelStyle += DIM;
-  const time = relativeTime(message.timestamp, now);
+  const time = relativeTime(message.timestamp, now, lang);
   const clock = localTimeOfDay(message.timestamp);
   out.push(
     `${cursorMark}${bar}${labelStyle}${labelText}${RESET}${DIM}  ·  ${time}  ·  ${clock}${RESET}`,
@@ -83,15 +85,21 @@ export function renderMessageLines(message: Message, opts: RenderMessageOpts): s
   let bodyStyle = "";
 
   if (message.role === "tool_use" || message.role === "tool_result") {
-    if (!expanded) {
-      const first = (message.content || "").split("\n")[0] ?? "";
-      const lineCount = (message.content || "").split("\n").length;
-      const tail = lineCount > 1 ? `  (${lineCount} lines)` : "";
-      bodyText = truncate(`▸ ${first}${tail}`, bodyWidth);
-      bodyStyle = DIM;
+    const content = message.content || "";
+    const lines = content.split("\n");
+    const lineCount = lines.length;
+    bodyStyle = DIM;
+    // Single-line tool bodies have nothing to reveal — drop the disclosure
+    // icon and the expand affordance entirely. Multi-line bodies keep the
+    // icon in both states so the user can see *that* the row is expandable
+    // (▸ collapsed, ▾ expanded) instead of having the marker disappear on
+    // open.
+    if (lineCount <= 1) {
+      bodyText = truncate(content, bodyWidth);
+    } else if (!expanded) {
+      bodyText = truncate(`▸ ${lines[0] ?? ""}  (${lineCount} lines)`, bodyWidth);
     } else {
-      bodyText = message.content || "";
-      bodyStyle = DIM;
+      bodyText = `▾ ${content}`;
     }
   } else if (message.role === "system") {
     bodyText = message.content || "";
@@ -135,6 +143,7 @@ function memoRenderMessageLines(
   expanded: boolean,
   emoji: boolean,
   now: Date,
+  lang: Lang,
 ): string[] {
   let bucket = messageLineCache.get(message);
   if (!bucket) {
@@ -144,11 +153,11 @@ function memoRenderMessageLines(
   // Round 'now' to the minute so cached line entries don't churn on every
   // render but still pick up "Nm ago → (N+1)m ago" eventually.
   const nowMin = Math.floor(now.getTime() / 60_000);
-  const key = `${width}|${emoji ? 1 : 0}|${expanded ? 1 : 0}|${nowMin}`;
+  const key = `${width}|${emoji ? 1 : 0}|${expanded ? 1 : 0}|${nowMin}|${lang}`;
   const cached = bucket.get(key);
   if (cached !== undefined) return cached;
 
-  const lines = renderMessageLines(message, { width, current: false, expanded, emoji, now });
+  const lines = renderMessageLines(message, { width, current: false, expanded, emoji, now, lang });
   bucket.set(key, lines);
   if (bucket.size > PER_MESSAGE_CACHE_LIMIT) {
     const firstKey: string | undefined = bucket.keys().next().value;
@@ -171,6 +180,7 @@ export type RenderConversationOpts = {
   now: Date;
   query: string;
   matchIndex: number;
+  lang?: Lang;
 };
 
 const YIELD_EVERY = 64;
@@ -251,8 +261,9 @@ function renderOne(
   useCache: boolean,
   i: number,
 ): string[] {
+  const lang = opts.lang ?? DEFAULT_LANG;
   if (useCache) {
-    return memoRenderMessageLines(message, opts.width, opts.expanded.has(i), opts.emoji, opts.now);
+    return memoRenderMessageLines(message, opts.width, opts.expanded.has(i), opts.emoji, opts.now, lang);
   }
   return renderMessageLines(message, {
     width: opts.width,
@@ -260,6 +271,7 @@ function renderOne(
     expanded: opts.expanded.has(i),
     emoji: opts.emoji,
     now: opts.now,
+    lang,
   });
 }
 

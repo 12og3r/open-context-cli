@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
+import { t } from "../lib/i18n.ts";
+import { useLang } from "../hooks/use-lang.ts";
 
 export function PathInput({
   reason,
@@ -11,19 +13,20 @@ export function PathInput({
   error?: string;
   onSubmit: (path: string) => void;
 }) {
+  const lang = useLang();
   const [value, setValue] = useState("");
   return (
     <Box flexDirection="column" paddingX={2} paddingY={1} width={72}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">open-context</Text>
-        <Text dimColor>  ·  session browser</Text>
+        <Text bold color="cyan">{t(lang, "path.brand")}</Text>
+        <Text dimColor>  ·  {t(lang, "path.subtitle")}</Text>
       </Box>
       {reason === "no-default-path" && (
         <Box marginBottom={1}>
-          <Text dimColor>No sessions found in the default location.</Text>
+          <Text dimColor>{t(lang, "path.no_default")}</Text>
         </Box>
       )}
-      <Text>Enter a path to a directory or .jsonl file</Text>
+      <Text>{t(lang, "path.prompt")}</Text>
       <Box marginTop={1}>
         <Text color="cyan">▍ </Text>
         <TextInput value={value} onChange={setValue} onSubmit={onSubmit} />

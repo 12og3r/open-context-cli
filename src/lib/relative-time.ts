@@ -1,3 +1,5 @@
+import { DEFAULT_LANG, t, type Lang } from "./i18n.ts";
+
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
@@ -24,21 +26,25 @@ export function localTimeOfDay(d: Date): string {
   return `${h}:${m}`;
 }
 
-export function relativeTime(when: Date, now: Date = new Date()): string {
+export function relativeTime(
+  when: Date,
+  now: Date = new Date(),
+  lang: Lang = DEFAULT_LANG,
+): string {
   const rawDelta = now.getTime() - when.getTime();
   // Small forward clock skew (when slightly in the future): treat as "just now".
   // Large future timestamps (e.g. corrupt logs): fall through to ISO date so
   // we don't lie about the present.
   if (rawDelta < 0) {
-    if (-rawDelta < MIN) return "just now";
+    if (-rawDelta < MIN) return t(lang, "rt.just_now");
     return isoDate(when);
   }
   const delta = rawDelta;
-  if (delta < MIN) return "just now";
-  if (delta < HOUR) return `${Math.floor(delta / MIN)}m ago`;
+  if (delta < MIN) return t(lang, "rt.just_now");
+  if (delta < HOUR) return t(lang, "rt.minutes_ago", { n: Math.floor(delta / MIN) });
   const dayDiff = utcDayIndex(now) - utcDayIndex(when);
-  if (dayDiff === 0) return `${Math.floor(delta / HOUR)}h ago`;
-  if (dayDiff === 1) return "Yesterday";
-  if (dayDiff < 7) return `${dayDiff}d ago`;
+  if (dayDiff === 0) return t(lang, "rt.hours_ago", { n: Math.floor(delta / HOUR) });
+  if (dayDiff === 1) return t(lang, "rt.yesterday");
+  if (dayDiff < 7) return t(lang, "rt.days_ago", { n: dayDiff });
   return isoDate(when);
 }

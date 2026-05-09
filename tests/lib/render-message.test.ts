@@ -1,10 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { applyHighlight } from "../../src/lib/render-message.ts";
+import { applyHighlight, renderMessageLines } from "../../src/lib/render-message.ts";
 import type { Message } from "../../src/providers/types.ts";
 
 const msg = (content: string): Message => ({
   role: "user", content, timestamp: new Date(0), raw: {},
 });
+
+const tool = (content: string, toolName = "Read"): Message => ({
+  role: "tool_use", content, toolName, timestamp: new Date(0), raw: {},
+});
+
+function joinLines(lines: string[]): string {
+  return lines.join("\n");
+}
 
 describe("applyHighlight", () => {
   test("returns messages unchanged when query is empty", () => {
@@ -40,5 +48,37 @@ describe("applyHighlight", () => {
       { msgIndex: 0, contentOffset: 3, length: 2 },
       { msgIndex: 1, contentOffset: 0, length: 2 },
     ]);
+  });
+});
+
+describe("tool body disclosure icon", () => {
+  const opts = { width: 80, current: false, expanded: false, emoji: false, now: new Date(0) };
+
+  test("multi-line collapsed body uses ▸", () => {
+    const out = joinLines(renderMessageLines(tool("alpha\nbeta\ngamma"), opts));
+    expect(out).toContain("▸ alpha");
+    expect(out).not.toContain("▾");
+  });
+
+  test("multi-line expanded body keeps an icon — switches to ▾", () => {
+    const out = joinLines(
+      renderMessageLines(tool("alpha\nbeta\ngamma"), { ...opts, expanded: true }),
+    );
+    expect(out).toContain("▾ alpha");
+    expect(out).toContain("beta");
+    expect(out).toContain("gamma");
+    expect(out).not.toContain("▸");
+  });
+
+  test("single-line body shows no disclosure icon at all", () => {
+    const collapsed = joinLines(renderMessageLines(tool("just one line"), opts));
+    const expanded = joinLines(
+      renderMessageLines(tool("just one line"), { ...opts, expanded: true }),
+    );
+    expect(collapsed).not.toContain("▸");
+    expect(collapsed).not.toContain("▾");
+    expect(expanded).not.toContain("▸");
+    expect(expanded).not.toContain("▾");
+    expect(collapsed).toContain("just one line");
   });
 });
