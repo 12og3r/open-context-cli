@@ -54,8 +54,35 @@ If no sessions are found at the default location, the app prompts for a path.
 | `↑` / `↓`      | Scroll                          |
 | `Ctrl-F`       | Find within the conversation    |
 | `Tab`          | Expand the focused tool call    |
+| `⏎`            | On a user/assistant row: open the *Continue conversation* footer; ⏎ again confirms |
 | `esc` / `←` / `h` | Back to the list             |
 | `q`            | Quit                            |
+
+### Continue conversation
+
+With the cursor on any user or assistant message, hit `⏎` once to reveal a
+*Continue conversation* row at the bottom of the preview, then `⏎` again to
+fork the session. `open-context` writes a fresh JSONL alongside the original
+(new UUID, same project directory) containing the entries up to your cut
+point, then runs `claude --resume <new-uuid>`.
+
+What happens at the cut point depends on which message you picked:
+
+- **User message** — the new history stops *before* this entry; the message
+  text is pre-filled into claude's input box (via PTY + bracketed paste) so
+  you can edit it before sending.
+- **Assistant message** — the new history *includes* this entry; the input
+  box is empty, ready for whatever you want to say next.
+
+The Settings panel exposes a *Continue-conversation launch mode* option:
+
+- **Reuse current terminal** (default) — `open-context` exits and hands the
+  current terminal over to `claude` via [`@lydell/node-pty`][nodepty].
+- **Open in new terminal window** (macOS only) — `open-context` keeps
+  running, copies the user message to the clipboard with `pbcopy`, and asks
+  Terminal.app to open a fresh window. Paste with Cmd+V.
+
+[nodepty]: https://github.com/lydell/node-pty
 
 ## How sessions are discovered
 
@@ -99,3 +126,8 @@ bun run build        # bundle to dist/cli.js
 
 Tests use `ink-testing-library` for components and fixture `.jsonl` files in
 `tests/fixtures/` for the provider layer.
+
+`@lydell/node-pty` is a native dependency. Prebuilt binaries exist for
+darwin-x64, darwin-arm64, linux-x64, linux-arm64, and win-x64; if your
+platform isn't covered, `npm install` will fall back to `node-gyp`, which
+needs Python 3 and a C++ toolchain on PATH.
