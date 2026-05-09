@@ -58,7 +58,7 @@ const en: StringTable = {
   "settings.launch_mode.option_reuse": "Reuse current terminal",
   "settings.launch_mode.option_new_window": "Open in new terminal window",
   "settings.launch_mode.option_reuse_desc": "Hand the current terminal over to claude. PTY-based prefill works here.",
-  "settings.launch_mode.option_new_window_desc": "Spawn a new Terminal.app window (macOS only); user message is copied to the clipboard for manual paste.",
+  "settings.launch_mode.option_new_window_desc": "Open a new window in your terminal app (Terminal, iTerm, Ghostty, Warp; macOS only). User message is auto-sent as the first prompt.",
   "settings.launch_mode.unsupported_note": "macOS only",
 
   // Continue conversation
@@ -164,7 +164,7 @@ const zh: StringTable = {
   "settings.launch_mode.option_reuse": "复用当前终端",
   "settings.launch_mode.option_new_window": "弹出新终端窗口",
   "settings.launch_mode.option_reuse_desc": "把当前终端交给 claude；可用 PTY 自动预填用户消息。",
-  "settings.launch_mode.option_new_window_desc": "弹出一个新的 Terminal.app 窗口（仅 macOS）；用户消息会复制到剪贴板，由你手动粘贴。",
+  "settings.launch_mode.option_new_window_desc": "在你的终端 app 里弹新窗口（支持 Terminal / iTerm / Ghostty / Warp；仅 macOS）。用户消息会自动作为首条 prompt 发送。",
   "settings.launch_mode.unsupported_note": "仅 macOS 支持",
 
   "continue.footer_label": "↪ 继续对话",

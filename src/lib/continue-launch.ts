@@ -79,7 +79,7 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
 
   // mode === "new-window"
   try {
-    await spawnNewWindow({ cwd, resumeId: newUuid, clipboardText: req.userText });
+    await spawnNewWindow({ cwd, resumeId: newUuid, userText: req.userText });
     return { ok: true };
   } catch (e) {
     await silentRemove(dstPath);
