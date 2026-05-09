@@ -12,6 +12,7 @@ import { SessionBrowser } from "./components/session-browser.tsx";
 import { LangProvider } from "./hooks/use-lang.ts";
 import { useSettings } from "./hooks/use-settings.ts";
 import { t } from "./lib/i18n.ts";
+import type { ContinueRequest } from "./lib/continue-types.ts";
 
 type AppState =
   | { kind: "scanning"; root: string }
@@ -21,9 +22,11 @@ type AppState =
 export function App({
   initialPath,
   emoji = true,
+  onRequestContinue,
 }: {
   initialPath?: string;
   emoji?: boolean;
+  onRequestContinue?: (req: ContinueRequest) => void;
 }) {
   const provider = useMemo(() => getProvider(), []);
   const { exit } = useApp();
@@ -99,6 +102,12 @@ export function App({
             if (prev.kind !== "browser") return prev;
             return { ...prev, sessions: prev.sessions.filter(s => s.id !== id) };
           });
+        }}
+        onRequestContinue={(req) => {
+          // Surface up to the host (cli.tsx) and unmount Ink so the launcher
+          // can take over the terminal cleanly.
+          onRequestContinue?.(req);
+          exit();
         }}
       />
     </LangProvider>

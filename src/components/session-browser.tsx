@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import { Box, Text, useInput, useStdout } from "ink";
 import Spinner from "ink-spinner";
 import type { SessionMeta, SessionProvider } from "../providers/types.ts";
+import type { ContinueRequest } from "../lib/continue-types.ts";
 import { SessionList } from "./session-list.tsx";
 import { SessionPreview } from "./session-preview.tsx";
 import { SearchBar } from "./search-bar.tsx";
@@ -31,6 +32,7 @@ export function SessionBrowser({
   onRequestPathInput,
   onQuit,
   onSessionRemoved,
+  onRequestContinue,
 }: {
   provider: SessionProvider;
   sessions: SessionMeta[];
@@ -40,6 +42,7 @@ export function SessionBrowser({
   onRequestPathInput: () => void;
   onQuit: () => void;
   onSessionRemoved?: (id: string) => void;
+  onRequestContinue?: (req: ContinueRequest) => void;
 }) {
   const lang = useLang();
   // Width-stable Unicode icons (each 1 cell across all major terminals).
@@ -336,6 +339,16 @@ export function SessionBrowser({
                   width={rightInnerWidth}
                   emoji={emoji}
                   showHash={settings.showHash}
+                  onRequestContinue={(info) => {
+                    if (!selected || !onRequestContinue) return;
+                    onRequestContinue({
+                      sourcePath: selected.filePath,
+                      targetUuid: info.targetUuid,
+                      targetRole: info.targetRole,
+                      userText: info.userText,
+                      launchMode: settings.continueLaunchMode,
+                    });
+                  }}
                 />
               )}
             </>

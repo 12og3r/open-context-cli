@@ -2,6 +2,7 @@
 import React from "react";
 import { render } from "ink";
 import { App } from "./app.tsx";
+import type { ContinueRequest } from "./lib/continue-types.ts";
 
 function parseArgs(argv: string[]): { path?: string; emoji: boolean } {
   let path: string | undefined;
@@ -29,4 +30,24 @@ Options:
 }
 
 const { path: initialPath, emoji } = parseArgs(process.argv);
-render(<App initialPath={initialPath} emoji={emoji} />);
+
+let pendingContinue: ContinueRequest | null = null;
+const inkApp = render(
+  <App
+    initialPath={initialPath}
+    emoji={emoji}
+    onRequestContinue={(req) => { pendingContinue = req; }}
+  />,
+);
+
+await inkApp.waitUntilExit();
+
+if (pendingContinue) {
+  const { executeContinue } = await import("./lib/continue-launch.ts");
+  const result = await executeContinue(pendingContinue);
+  if (!result.ok) {
+    process.stderr.write(`open-context: ${result.error}\n`);
+    process.exit(1);
+  }
+  process.exit(result.childExitCode ?? 0);
+}
