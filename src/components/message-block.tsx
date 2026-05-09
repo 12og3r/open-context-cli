@@ -2,7 +2,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { Message, Role } from "../providers/types.ts";
-import { relativeTime } from "../lib/relative-time.ts";
+import { localTimeOfDay, relativeTime } from "../lib/relative-time.ts";
 import { markdownToAnsi } from "../lib/markdown-ansi.ts";
 
 const ROLE_EMOJI: Record<Role, string> = {
@@ -36,6 +36,7 @@ export function MessageBlock({
 }) {
   const headerLabel = headerFor(message);
   const time = relativeTime(message.timestamp, now);
+  const clock = localTimeOfDay(message.timestamp);
   const headerText = `${emoji ? ROLE_EMOJI[message.role] + " " : ""}${headerLabel}`;
   const color = ROLE_COLOR[message.role];
   const isPrimary = message.role === "user" || message.role === "assistant";
@@ -53,7 +54,7 @@ export function MessageBlock({
         >
           {headerText}
         </Text>
-        <Text dimColor>  ·  {time}</Text>
+        <Text dimColor>  ·  {time}  ·  {clock}</Text>
       </Text>
       <Box paddingLeft={4}>
         <Body message={message} expanded={expanded} />

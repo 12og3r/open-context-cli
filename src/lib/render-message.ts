@@ -2,7 +2,7 @@ import wrapAnsi from "wrap-ansi";
 import type { Message, Role } from "../providers/types.ts";
 import { markdownToAnsi } from "./markdown-ansi.ts";
 import { findMatches, type Match } from "./matches.ts";
-import { relativeTime } from "./relative-time.ts";
+import { localTimeOfDay, relativeTime } from "./relative-time.ts";
 import { truncate } from "./truncate.ts";
 
 const RESET = "\x1b[0m";
@@ -72,8 +72,9 @@ export function renderMessageLines(message: Message, opts: RenderMessageOpts): s
   if (message.role === "system") labelStyle += ITALIC;
   if (muted) labelStyle += DIM;
   const time = relativeTime(message.timestamp, now);
+  const clock = localTimeOfDay(message.timestamp);
   out.push(
-    `${cursorMark}${bar}${labelStyle}${labelText}${RESET}${DIM}  ·  ${time}${RESET}`,
+    `${cursorMark}${bar}${labelStyle}${labelText}${RESET}${DIM}  ·  ${time}  ·  ${clock}${RESET}`,
   );
 
   const indent = "    ";

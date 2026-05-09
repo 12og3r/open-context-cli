@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { relativeTime } from "../../src/lib/relative-time.ts";
+import { localTimeOfDay, relativeTime } from "../../src/lib/relative-time.ts";
 
 const NOW = new Date("2026-05-07T12:00:00Z");
 
@@ -34,5 +34,19 @@ describe("relativeTime", () => {
 
   test("large future date → ISO date", () => {
     expect(relativeTime(new Date("2030-01-01T00:00:00Z"), NOW)).toBe("2030-01-01");
+  });
+});
+
+describe("localTimeOfDay", () => {
+  test("formats hours and minutes with zero-padding in the local timezone", () => {
+    // Build the date from local components so the test is timezone-independent:
+    // whatever zone the runner sits in, 09:05 local should round-trip exactly.
+    const d = new Date(2026, 4, 7, 9, 5, 0, 0);
+    expect(localTimeOfDay(d)).toBe("09:05");
+  });
+
+  test("pads the 24h end of the day", () => {
+    const d = new Date(2026, 4, 7, 23, 59, 0, 0);
+    expect(localTimeOfDay(d)).toBe("23:59");
   });
 });

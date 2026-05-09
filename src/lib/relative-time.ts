@@ -15,6 +15,15 @@ function isoDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** "HH:MM" in the viewer's local timezone — used as a precise companion to the
+ * relative-time string so users can see exactly when a message landed without
+ * computing it themselves. */
+export function localTimeOfDay(d: Date): string {
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${h}:${m}`;
+}
+
 export function relativeTime(when: Date, now: Date = new Date()): string {
   const rawDelta = now.getTime() - when.getTime();
   // Small forward clock skew (when slightly in the future): treat as "just now".
