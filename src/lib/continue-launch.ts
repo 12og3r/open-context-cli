@@ -1,6 +1,5 @@
 import path from "node:path";
 import fs from "node:fs/promises";
-import os from "node:os";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import process from "node:process";
@@ -9,6 +8,7 @@ import { forkSession } from "./continue-fork.ts";
 import { runPty } from "./continue-pty.ts";
 import { spawnNewWindow } from "./continue-spawn.ts";
 import { decodeProjectPath, encodeProjectPath } from "./decode-project-path.ts";
+import { claudeProjectsDir } from "./claude-paths.ts";
 import { trace } from "./debug-trace.ts";
 
 export interface ContinueResult {
@@ -44,7 +44,7 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
   trace("launch", `cwd=${cwd}`);
 
   const newUuid = randomUUID();
-  const dstDir = path.join(os.homedir(), ".claude", "projects", encodeProjectPath(cwd));
+  const dstDir = path.join(claudeProjectsDir(), encodeProjectPath(cwd));
   const dstPath = path.join(dstDir, `${newUuid}.jsonl`);
   trace("launch", `fork → ${dstPath}${req.forceCwd ? " (force)" : ""}`);
 

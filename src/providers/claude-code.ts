@@ -1,14 +1,14 @@
 import path from "node:path";
 import fs from "node:fs/promises";
-import os from "node:os";
 import { createReadStream } from "node:fs";
 import readline from "node:readline";
 import { decodeProjectPath } from "../lib/decode-project-path.ts";
+import { claudeProjectsDir } from "../lib/claude-paths.ts";
 import type { Message, SessionMeta, SessionProvider } from "./types.ts";
 
 export class ClaudeCodeProvider implements SessionProvider {
   readonly name = "claude-code";
-  readonly defaultPaths = [path.join(os.homedir(), ".claude", "projects")];
+  readonly defaultPaths = [claudeProjectsDir()];
 
   async listSessions(root: string): Promise<SessionMeta[]> {
     let entries: string[];

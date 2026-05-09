@@ -11,6 +11,11 @@ export interface Settings {
   showHash: boolean;
   language: Lang;
   continueLaunchMode: ContinueLaunchMode;
+  // Empty string = use the provider's default location. We intentionally
+  // accept any non-empty string here without filesystem validation; the
+  // app-level scanner is the layer that decides what to do with a missing
+  // or empty directory.
+  sessionsDir: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -18,14 +23,15 @@ export const DEFAULT_SETTINGS: Settings = {
   showHash: true,
   language: DEFAULT_LANG,
   continueLaunchMode: "reuse-current",
+  sessionsDir: "",
 };
 
 export function settingsDir(): string {
-  return path.join(os.homedir(), ".context-cli");
+  return path.join(os.homedir(), "open-ctx");
 }
 
 export function settingsPath(): string {
-  return path.join(settingsDir(), ".settings.json");
+  return path.join(settingsDir(), "settings.json");
 }
 
 export async function loadSettings(): Promise<Settings> {
@@ -65,6 +71,9 @@ function sanitize(p: Partial<Settings>): Partial<Settings> {
   }
   if (p.continueLaunchMode === "reuse-current" || p.continueLaunchMode === "new-window") {
     out.continueLaunchMode = p.continueLaunchMode;
+  }
+  if (typeof p.sessionsDir === "string") {
+    out.sessionsDir = p.sessionsDir;
   }
   return out;
 }
