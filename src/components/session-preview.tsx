@@ -20,6 +20,7 @@ export function SessionPreview({
   height,
   width,
   emoji = true,
+  showHash = false,
 }: {
   messages: Message[];
   sessionId: string | null;
@@ -27,6 +28,7 @@ export function SessionPreview({
   height: number;
   width: number;
   emoji?: boolean;
+  showHash?: boolean;
 }) {
   // pinToBottom: while true, the viewport sticks to the latest message and the
   //   cursor sits on lastIdx automatically. Any j/k/g/PgUp/PgDn unpins.
@@ -426,17 +428,42 @@ export function SessionPreview({
           <Text key={i} wrap="truncate">{line || " "}</Text>
         ))}
       </Box>
-      {showOverflowHint && (
+      {(showOverflowHint || showHash) && (
         <Box flexShrink={0}>
           <Text dimColor>
             {hasAbove ? "  ↑ " : "    "}
             {effectiveCursor + 1} / {messages.length}
             {hasBelow ? "  ↓" : "   "}
+            {showHash && (sessionHash7(sessionId) || msgHash7(messages[effectiveCursor]))
+              ? `  ·  ${formatHashes(sessionId, messages[effectiveCursor])}`
+              : ""}
           </Text>
         </Box>
       )}
     </Box>
   );
+}
+
+const HASH_LEN = 7;
+
+function shortHash(s: string | null | undefined): string {
+  if (!s) return "";
+  return s.slice(0, HASH_LEN);
+}
+
+function sessionHash7(sessionId: string | null): string {
+  return shortHash(sessionId);
+}
+
+function msgHash7(message: Message | undefined): string {
+  return shortHash(message?.uuid);
+}
+
+function formatHashes(sessionId: string | null, message: Message | undefined): string {
+  const sess = sessionHash7(sessionId);
+  const msg = msgHash7(message);
+  if (sess && msg) return `${sess}  ·  msg ${msg}`;
+  return sess || (msg ? `msg ${msg}` : "");
 }
 
 function clampToRange(n: number, lo: number, hi: number): number {

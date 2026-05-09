@@ -229,6 +229,7 @@ export function SessionBrowser({
                   height={innerHeight}
                   width={rightInnerWidth}
                   emoji={emoji}
+                  showHash={settings.showHash}
                 />
               )}
             </>

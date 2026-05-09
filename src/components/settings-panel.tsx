@@ -4,19 +4,15 @@ import type { Settings, DisplayMode } from "../lib/settings.ts";
 
 const ACCENT = "cyan";
 
-interface OptionDef<V extends string> {
-  value: V;
-  label: string;
-  description: string;
-}
+type FieldDef = {
+  [K in keyof Settings]: {
+    key: K;
+    title: string;
+    options: Array<{ value: Settings[K]; label: string; description: string }>;
+  };
+}[keyof Settings];
 
-interface FieldDef<K extends keyof Settings> {
-  key: K;
-  title: string;
-  options: OptionDef<Settings[K] & string>[];
-}
-
-const FIELDS: [FieldDef<"displayMode">] = [
+const FIELDS: FieldDef[] = [
   {
     key: "displayMode",
     title: "Display mode",
@@ -30,6 +26,22 @@ const FIELDS: [FieldDef<"displayMode">] = [
         value: "full",
         label: "Full",
         description: "Show every message, including tool calls and results.",
+      },
+    ],
+  },
+  {
+    key: "showHash",
+    title: "Show hash",
+    options: [
+      {
+        value: true,
+        label: "On",
+        description: "Show sessionId and the current message's uuid in the preview footer.",
+      },
+      {
+        value: false,
+        label: "Off",
+        description: "Hide hash values in the preview footer.",
       },
     ],
   },
@@ -84,31 +96,34 @@ export function SettingsPanel({
     }
   });
 
-  function moveCursor<K extends keyof Settings>(f: FieldDef<K>, dir: 1 | -1) {
+  function moveCursor(f: FieldDef, dir: 1 | -1) {
     setOptionCursor(prev => {
       const len = f.options.length;
-      const cur = prev[f.key as string] ?? 0;
-      return { ...prev, [f.key as string]: (cur + dir + len) % len };
+      const cur = prev[f.key] ?? 0;
+      return { ...prev, [f.key]: (cur + dir + len) % len };
     });
   }
 
-  function applyCursor<K extends keyof Settings>(f: FieldDef<K>) {
-    const idx = optionCursor[f.key as string] ?? 0;
+  function applyCursor(f: FieldDef) {
+    const idx = optionCursor[f.key] ?? 0;
     const next = f.options[idx]!;
-    onChange(f.key, next.value as Settings[K]);
+    // The FieldDef union ties f.key to the option's value type, but TS can't
+    // see through the parametrized callback signature; the cast below is safe
+    // because the runtime pair (key, value) always matches by construction.
+    (onChange as (k: string, v: unknown) => void)(f.key, next.value);
   }
 
   return (
     <Box flexDirection="column" width={width} height={height}>
       <Box flexShrink={0} marginBottom={1}>
         <Text dimColor>
-          ←→ move cursor · space to apply · ⏎ confirm · esc back
+          ↑↓ field · ←→ move cursor · space to apply · ⏎ confirm · esc back
         </Text>
       </Box>
       {FIELDS.map((f, i) => {
         const fieldSelected = i === fieldIdx;
         const current = settings[f.key];
-        const cursorIdx = optionCursor[f.key as string] ?? 0;
+        const cursorIdx = optionCursor[f.key] ?? 0;
         return (
           <Box key={f.key} flexDirection="column" marginBottom={1}>
             <Box>
@@ -121,7 +136,7 @@ export function SettingsPanel({
                 const isApplied = opt.value === current;
                 const isCursor = focused && fieldSelected && oi === cursorIdx;
                 return (
-                  <Box key={opt.value} marginRight={oi < f.options.length - 1 ? 2 : 0}>
+                  <Box key={String(opt.value)} marginRight={oi < f.options.length - 1 ? 2 : 0}>
                     <Option label={opt.label} applied={isApplied} cursor={isCursor} />
                   </Box>
                 );
@@ -166,7 +181,7 @@ function initialCursor(settings: Settings): Record<string, number> {
   const out: Record<string, number> = {};
   for (const f of FIELDS) {
     const i = f.options.findIndex(o => o.value === settings[f.key]);
-    out[f.key as string] = i >= 0 ? i : 0;
+    out[f.key] = i >= 0 ? i : 0;
   }
   return out;
 }

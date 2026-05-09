@@ -55,12 +55,13 @@ function messagesFromEntry(entry: Record<string, unknown>): Message[] {
   const type = entry.type;
   if (type !== "user" && type !== "assistant") return [];
   const ts = parseTs(entry.timestamp);
+  const uuid = typeof entry.uuid === "string" ? entry.uuid : undefined;
   const message = entry.message as { content?: unknown } | undefined;
   const content = message?.content;
   const out: Message[] = [];
 
   if (typeof content === "string") {
-    out.push({ role: type, content, timestamp: ts, raw: entry });
+    out.push({ role: type, content, timestamp: ts, uuid, raw: entry });
     return out;
   }
   if (!Array.isArray(content)) return out;
@@ -73,7 +74,7 @@ function messagesFromEntry(entry: Record<string, unknown>): Message[] {
       textBuf += (textBuf ? "\n\n" : "") + p.text;
     } else if (p.type === "tool_use") {
       if (textBuf) {
-        out.push({ role: type, content: textBuf, timestamp: ts, raw: entry });
+        out.push({ role: type, content: textBuf, timestamp: ts, uuid, raw: entry });
         textBuf = "";
       }
       out.push({
@@ -81,11 +82,12 @@ function messagesFromEntry(entry: Record<string, unknown>): Message[] {
         content: p.input != null ? JSON.stringify(p.input, null, 2) : "",
         timestamp: ts,
         toolName: p.name,
+        uuid,
         raw: part,
       });
     } else if (p.type === "tool_result") {
       if (textBuf) {
-        out.push({ role: type, content: textBuf, timestamp: ts, raw: entry });
+        out.push({ role: type, content: textBuf, timestamp: ts, uuid, raw: entry });
         textBuf = "";
       }
       const body = typeof p.content === "string"
@@ -99,11 +101,12 @@ function messagesFromEntry(entry: Record<string, unknown>): Message[] {
         role: "tool_result",
         content: body,
         timestamp: ts,
+        uuid,
         raw: part,
       });
     }
   }
-  if (textBuf) out.push({ role: type, content: textBuf, timestamp: ts, raw: entry });
+  if (textBuf) out.push({ role: type, content: textBuf, timestamp: ts, uuid, raw: entry });
   return out;
 }
 

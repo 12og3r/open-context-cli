@@ -6,10 +6,12 @@ export type DisplayMode = "concise" | "full";
 
 export interface Settings {
   displayMode: DisplayMode;
+  showHash: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   displayMode: "full",
+  showHash: true,
 };
 
 export function settingsDir(): string {
@@ -48,6 +50,9 @@ function sanitize(p: Partial<Settings>): Partial<Settings> {
   const out: Partial<Settings> = {};
   if (p.displayMode === "concise" || p.displayMode === "full") {
     out.displayMode = p.displayMode;
+  }
+  if (typeof p.showHash === "boolean") {
+    out.showHash = p.showHash;
   }
   return out;
 }

@@ -7,6 +7,8 @@ export interface Message {
   content: string;     // raw text; markdown is rendered at the component layer
   timestamp: Date;
   toolName?: string;   // populated when role === "tool_use" or "tool_result"
+  uuid?: string;       // uuid of the source JSONL entry; multiple split messages
+                       // (text + tool_use + tool_result from one entry) share it
   raw: unknown;        // original parsed JSONL entry, for debugging/expand
 }
 

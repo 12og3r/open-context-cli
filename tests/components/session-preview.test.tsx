@@ -29,6 +29,48 @@ describe("SessionPreview", () => {
     expect(lastFrame() ?? "").toContain("(no messages)");
   });
 
+  test("showHash appends session and message hash to the count line", async () => {
+    const messages: Message[] = [
+      { role: "user", content: "hello", timestamp: new Date(0), uuid: "abcdef0123-rest", raw: {} },
+    ];
+    const { lastFrame } = render(
+      <SessionPreview
+        messages={messages}
+        sessionId="0123456789abcdef-rest"
+        focused={false}
+        height={4}
+        width={60}
+        emoji={false}
+        showHash={true}
+      />
+    );
+    await tick();
+    const out = lastFrame() ?? "";
+    expect(out).toContain("0123456");        // first 7 of sessionId
+    expect(out).toContain("msg abcdef0");    // first 7 of message uuid
+  });
+
+  test("showHash off keeps the footer free of hash markers", async () => {
+    const messages: Message[] = [
+      { role: "user", content: "hello", timestamp: new Date(0), uuid: "abcdef0123", raw: {} },
+    ];
+    const { lastFrame } = render(
+      <SessionPreview
+        messages={messages}
+        sessionId="0123456789"
+        focused={false}
+        height={4}
+        width={60}
+        emoji={false}
+        showHash={false}
+      />
+    );
+    await tick();
+    const out = lastFrame() ?? "";
+    expect(out).not.toContain("0123456");
+    expect(out).not.toContain("msg ");
+  });
+
   test("Ctrl+F sets matchIndex to the first match at or after current cursor", async () => {
     const messages = [
       { role: "assistant", content: "no match", timestamp: new Date(0), raw: {} },
