@@ -1,4 +1,5 @@
 import process from "node:process";
+import { trace } from "./debug-trace.ts";
 
 const PASTE_START = "\x1b[200~";
 const PASTE_END   = "\x1b[201~";
@@ -9,17 +10,16 @@ export interface PtyRunSpec {
   prefillText?: string;
 }
 
+const debug = (s: string) => trace("pty", s);
+
 // Spawn `claude --resume <id>` via node-pty, attach stdio, optionally inject
 // `prefillText` as a bracketed paste (~80ms after the first stdout chunk so
 // the Ink UI inside claude has had a chance to draw its prompt). Resolves
 // with the child's exit code.
-const debug = (s: string) => {
-  if (process.env.OPEN_CONTEXT_DEBUG) process.stderr.write(`[oc:pty] ${s}\n`);
-};
-
 export async function runPty(spec: PtyRunSpec): Promise<number> {
   debug("import @lydell/node-pty");
   const ptyMod = await import("@lydell/node-pty");
+  debug("import ok");
   const cols = process.stdout.columns ?? 100;
   const rows = process.stdout.rows ?? 30;
   const env = { ...process.env, TERM: process.env.TERM ?? "xterm-256color" };
@@ -41,8 +41,11 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
   };
 
   let firstChunkSeen = false;
+  let chunkCount = 0;
   const onData = child.onData((data) => {
+    chunkCount += 1;
     if (!firstChunkSeen) { firstChunkSeen = true; debug(`first chunk ${data.length} bytes`); }
+    if (chunkCount <= 5) debug(`chunk #${chunkCount} ${data.length}b head=${JSON.stringify(data.slice(0, 40))}`);
     process.stdout.write(data);
     if (!injected && spec.prefillText) {
       // Wait one paint after the first byte, then inject.

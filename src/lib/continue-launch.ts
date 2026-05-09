@@ -8,6 +8,7 @@ import { forkSession } from "./continue-fork.ts";
 import { runPty } from "./continue-pty.ts";
 import { spawnNewWindow } from "./continue-spawn.ts";
 import { decodeProjectPath } from "./decode-project-path.ts";
+import { trace } from "./debug-trace.ts";
 
 export interface ContinueResult {
   ok: boolean;
@@ -17,18 +18,16 @@ export interface ContinueResult {
   childExitCode?: number;
 }
 
-const debug = (s: string) => {
-  if (process.env.OPEN_CONTEXT_DEBUG) process.stderr.write(`[oc:launch] ${s}\n`);
-};
-
 export async function executeContinue(req: ContinueRequest): Promise<ContinueResult> {
-  debug(`enter mode=${req.launchMode} role=${req.targetRole} uuid=${req.targetUuid.slice(0, 8)}`);
+  trace("launch", `enter mode=${req.launchMode} role=${req.targetRole} uuid=${req.targetUuid.slice(0, 8)}`);
   if (!hasClaudeOnPath()) {
+    trace("launch", "preflight FAIL: claude not on PATH");
     return { ok: false, error: "claude not found in PATH" };
   }
-  debug("preflight: claude on PATH");
+  trace("launch", "preflight: claude on PATH");
 
   if (req.launchMode === "reuse-current" && !process.stdout.isTTY) {
+    trace("launch", "preflight FAIL: stdout not TTY");
     return { ok: false, error: "current stdout is not a TTY" };
   }
 
@@ -39,7 +38,7 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
   const newUuid = randomUUID();
   const dir = path.dirname(req.sourcePath);
   const dstPath = path.join(dir, `${newUuid}.jsonl`);
-  debug(`fork → ${dstPath}`);
+  trace("launch", `fork → ${dstPath}`);
 
   try {
     await forkSession({
@@ -50,20 +49,22 @@ export async function executeContinue(req: ContinueRequest): Promise<ContinueRes
       newSessionId: newUuid,
     });
   } catch (e) {
+    trace("launch", `fork FAIL: ${(e as Error).message}`);
     return { ok: false, error: `failed to fork session: ${(e as Error).message}` };
   }
-  debug("fork ok");
+  trace("launch", "fork ok");
 
   const cwd = await detectProjectCwd(req.sourcePath);
-  debug(`cwd=${cwd}`);
+  trace("launch", `cwd=${cwd}`);
 
   if (req.launchMode === "reuse-current") {
-    debug("runPty starting");
+    trace("launch", "runPty starting");
     try {
       const code = await runPty({ cwd, resumeId: newUuid, prefillText: req.userText });
-      debug(`runPty exited code=${code}`);
+      trace("launch", `runPty exited code=${code}`);
       return { ok: true, childExitCode: code };
     } catch (e) {
+      trace("launch", `runPty FAIL: ${(e as Error).message}`);
       await silentRemove(dstPath);
       return { ok: false, error: `failed to launch claude: ${(e as Error).message}` };
     }
