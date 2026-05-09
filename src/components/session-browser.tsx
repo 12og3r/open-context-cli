@@ -100,7 +100,7 @@ export function SessionBrowser({
 
     if (focus === "list") {
       if (input === "p") { onRequestPathInput(); return; }
-      if (key.escape) { setFocus("feature-bar"); return; }
+      if (key.tab) { setFocus("feature-bar"); return; }
       if (input === "j" || key.downArrow) setSelectedIdx(i => Math.min(filtered.length - 1, i + 1));
       else if (input === "k" || key.upArrow) setSelectedIdx(i => Math.max(0, i - 1));
       else if (key.return || input === "l" || key.rightArrow) {
@@ -118,6 +118,11 @@ export function SessionBrowser({
 
     if (focus === "feature-bar") {
       if (key.escape) { setFocus("list"); return; }
+      if (key.tab) {
+        // Tab cycles within the bar (wraps); only Esc leaves.
+        setFeatureIdx(i => (i + 1) % FEATURES.length);
+        return;
+      }
       if (input === "j" || key.downArrow || input === "l" || key.rightArrow) {
         setFeatureIdx(i => Math.min(FEATURES.length - 1, i + 1));
       } else if (input === "k" || key.upArrow || input === "h" || key.leftArrow) {

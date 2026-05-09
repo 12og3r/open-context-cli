@@ -94,12 +94,12 @@ const en: StringTable = {
   // Footer hints — pipe-joined strings; one segment per token. Splitting at
   // render time avoids Record<FooterContext,string[]> here, which would force
   // i18n.ts to import a UI type and create a circular dependency.
-  "footer.list":           "↑↓ select|⏎ focus preview|/ search|esc menu|p path|q quit",
+  "footer.list":           "↑↓ select|⏎ focus preview|/ search|⇥ menu|p path|q quit",
   "footer.preview":        "↑↓ scroll|esc back|⌃F find|⇥ expand tool|q quit",
   "footer.list-search":    "type to filter|⏎ apply|esc cancel",
   "footer.preview-search": "type to search|⏎ commit|esc cancel",
   "footer.path-input":     "type a path|⏎ submit|esc quit",
-  "footer.feature-bar":    "←→ pick|⏎ open|esc back",
+  "footer.feature-bar":    "←→ pick|⇥ next|⏎ open|esc back",
   "footer.settings":       "↑↓ field|←→ cursor|space apply|⏎ confirm|esc back",
   "footer.delete-confirm": "←→ choose|⏎ confirm|esc cancel",
 };
@@ -171,12 +171,12 @@ const zh: StringTable = {
   "rt.hours_ago": "{n} 小时前",
   "rt.days_ago": "{n} 天前",
 
-  "footer.list":           "↑↓ 选择|⏎ 进入预览|/ 搜索|esc 菜单|p 路径|q 退出",
+  "footer.list":           "↑↓ 选择|⏎ 进入预览|/ 搜索|⇥ 菜单|p 路径|q 退出",
   "footer.preview":        "↑↓ 滚动|esc 返回|⌃F 查找|⇥ 展开工具|q 退出",
   "footer.list-search":    "输入以筛选|⏎ 应用|esc 取消",
   "footer.preview-search": "输入以搜索|⏎ 确认|esc 取消",
   "footer.path-input":     "输入路径|⏎ 提交|esc 退出",
-  "footer.feature-bar":    "←→ 选择|⏎ 打开|esc 返回",
+  "footer.feature-bar":    "←→ 选择|⇥ 下一项|⏎ 打开|esc 返回",
   "footer.settings":       "↑↓ 字段|←→ 光标|空格 切换|⏎ 确认|esc 返回",
   "footer.delete-confirm": "←→ 选择|⏎ 确认|esc 取消",
 };
