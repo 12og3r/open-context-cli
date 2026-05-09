@@ -50,9 +50,16 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
     }
   });
 
+  // Hand the user's keystrokes through to the child. Force raw mode + utf8
+  // encoding (string chunks). Bun's stdin defaults can pause without resume
+  // and silently swallow the keys; this dance matches node-pty's own example.
   process.stdin.setRawMode?.(true);
+  process.stdin.setEncoding?.("utf8");
   process.stdin.resume();
-  const onStdin = (buf: Buffer) => child.write(buf);
+  const onStdin = (chunk: string | Buffer) => {
+    debug(`stdin ${chunk.length}b`);
+    child.write(typeof chunk === "string" ? chunk : chunk.toString("utf8"));
+  };
   process.stdin.on("data", onStdin);
 
   const onResize = () => {
@@ -64,6 +71,7 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
 
   return await new Promise<number>((resolve) => {
     child.onExit(({ exitCode }) => {
+      debug(`child exit code=${exitCode}`);
       onData.dispose();
       process.stdin.off("data", onStdin);
       process.stdout.off("resize", onResize);

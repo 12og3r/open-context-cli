@@ -12,6 +12,7 @@ import { SearchBar } from "./search-bar.tsx";
 import type { Match } from "../lib/matches.ts";
 import { t } from "../lib/i18n.ts";
 import { useLang } from "../hooks/use-lang.ts";
+import { trace } from "../lib/debug-trace.ts";
 
 const EMPTY_BUFFER: ConversationBuffer = { lines: [], startLine: [], endLine: [], matches: [] };
 
@@ -312,15 +313,21 @@ export function SessionPreview({
     // Continue-conversation footer mode: suppress all preview navigation;
     // Enter confirms (calls back), Esc cancels.
     if (continueOpen) {
+      trace("preview", `continueOpen handler key.return=${!!key.return} key.escape=${!!key.escape}`);
       if (key.return) {
         const target = pinToBottom ? lastIdx : effectiveCursor;
         const msg = messages[target];
+        trace("preview", `confirm target=${target} role=${msg?.role} uuid=${msg?.uuid?.slice(0, 8) ?? "(none)"}`);
         if (msg && (msg.role === "user" || msg.role === "assistant") && typeof msg.uuid === "string") {
+          trace("preview", "calling onRequestContinue");
           onRequestContinue?.({
             targetUuid: msg.uuid,
             targetRole: msg.role,
             userText: msg.role === "user" ? msg.content : undefined,
           });
+          trace("preview", "onRequestContinue returned");
+        } else {
+          trace("preview", `gate failed: msg=${!!msg} uuidIsString=${typeof msg?.uuid === "string"}`);
         }
         setContinueOpen(false);
       } else if (key.escape) {

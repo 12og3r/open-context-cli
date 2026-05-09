@@ -13,6 +13,7 @@ import { LangProvider } from "./hooks/use-lang.ts";
 import { useSettings } from "./hooks/use-settings.ts";
 import { t } from "./lib/i18n.ts";
 import type { ContinueRequest } from "./lib/continue-types.ts";
+import { trace } from "./lib/debug-trace.ts";
 
 type AppState =
   | { kind: "scanning"; root: string }
@@ -106,8 +107,11 @@ export function App({
         onRequestContinue={(req) => {
           // Surface up to the host (cli.tsx) and unmount Ink so the launcher
           // can take over the terminal cleanly.
+          trace("app", `onRequestContinue mode=${req.launchMode} role=${req.targetRole}`);
           onRequestContinue?.(req);
+          trace("app", "calling exit()");
           exit();
+          trace("app", "exit() returned");
         }}
       />
     </LangProvider>

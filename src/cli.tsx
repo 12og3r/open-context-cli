@@ -3,6 +3,7 @@ import React from "react";
 import { render } from "ink";
 import { App } from "./app.tsx";
 import type { ContinueRequest } from "./lib/continue-types.ts";
+import { trace } from "./lib/debug-trace.ts";
 
 function parseArgs(argv: string[]): { path?: string; emoji: boolean } {
   let path: string | undefined;
@@ -42,13 +43,17 @@ const inkApp = render(
   />,
 );
 
+trace("cli", "awaiting waitUntilExit");
 await inkApp.waitUntilExit();
+trace("cli", `waitUntilExit resolved; slot.req=${slot.req ? "set" : "null"}`);
 
 const req = slot.req;
 if (req) {
+  trace("cli", `executing launcher mode=${req.launchMode}`);
   if (process.env.OPEN_CONTEXT_DEBUG) process.stderr.write(`[oc] ink exited; pendingContinue set, mode=${req.launchMode}\n`);
   const { executeContinue } = await import("./lib/continue-launch.ts");
   const result = await executeContinue(req);
+  trace("cli", `executeContinue returned ok=${result.ok}`);
   if (process.env.OPEN_CONTEXT_DEBUG) process.stderr.write(`[oc] executeContinue returned: ${JSON.stringify(result)}\n`);
   if (!result.ok) {
     process.stderr.write(`open-context: ${result.error}\n`);
