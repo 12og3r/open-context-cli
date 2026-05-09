@@ -33,6 +33,26 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
   });
   debug(`spawned pid=${child.pid}`);
 
+  // Sanity probes: verify stdout is still writable after Ink unmount, and
+  // that we can poll the child's liveness. Both go to stderr trace, not to
+  // process.stdout where they'd corrupt claude's UI.
+  try {
+    process.stdout.write("");
+    debug("stdout.write probe ok");
+  } catch (e) {
+    debug(`stdout.write probe FAIL: ${(e as Error).message}`);
+  }
+  setTimeout(() => {
+    if (child.pid) {
+      try {
+        process.kill(child.pid, 0);
+        debug(`child still alive at +500ms (pid=${child.pid})`);
+      } catch {
+        debug(`child not alive at +500ms (pid=${child.pid})`);
+      }
+    }
+  }, 500);
+
   let injected = false;
   const inject = () => {
     if (injected || !spec.prefillText) return;
@@ -73,14 +93,16 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
   process.stdout.on("resize", onResize);
 
   return await new Promise<number>((resolve) => {
-    child.onExit(({ exitCode }) => {
-      debug(`child exit code=${exitCode}`);
+    const onExitDisposable = child.onExit(({ exitCode, signal }) => {
+      debug(`child exit code=${exitCode} signal=${signal ?? "none"}`);
       onData.dispose();
+      onExitDisposable.dispose();
       process.stdin.off("data", onStdin);
       process.stdout.off("resize", onResize);
       process.stdin.setRawMode?.(false);
       process.stdin.pause();
       resolve(exitCode ?? 0);
     });
+    debug("onExit registered, awaiting child");
   });
 }
