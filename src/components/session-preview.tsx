@@ -477,10 +477,8 @@ export function SessionPreview({
       {continueOpen && (
         <Box flexDirection="column" flexShrink={0}>
           <Text dimColor>{"─".repeat(width)}</Text>
-          <Text wrap="truncate">
-            <Text color="cyan" bold>{t(lang, "continue.footer_label")}</Text>
-            <Text>   </Text>
-            <Text dimColor>{t(lang, "continue.confirm_hint")}</Text>
+          <Text wrap="truncate" color="cyan" bold>
+            {t(lang, "continue.footer_label")}
           </Text>
         </Box>
       )}

@@ -63,7 +63,6 @@ const en: StringTable = {
 
   // Continue conversation
   "continue.footer_label": "↪ Continue conversation",
-  "continue.confirm_hint": "Enter=confirm  Esc=cancel",
   "continue.error_no_claude": "claude not found in PATH",
   "continue.error_not_tty": "current stdout is not a TTY",
   "continue.error_unsupported": "\"new window\" mode is not supported on this platform",
@@ -165,7 +164,6 @@ const zh: StringTable = {
   "settings.launch_mode.unsupported_note": "仅 macOS 支持",
 
   "continue.footer_label": "↪ 继续对话",
-  "continue.confirm_hint": "Enter=确认  Esc=取消",
   "continue.error_no_claude": "在 PATH 中未找到 claude 命令",
   "continue.error_not_tty": "当前 stdout 不是 TTY",
   "continue.error_unsupported": "当前平台不支持「弹出新终端窗口」",
