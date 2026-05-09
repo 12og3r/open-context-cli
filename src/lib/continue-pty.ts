@@ -72,6 +72,7 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
   let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
   let chunkCount = 0;
 
+  let pasteModeSeen = false;
   const onData = child.onData((data) => {
     chunkCount += 1;
     if (firstChunkAt === 0) {
@@ -81,7 +82,11 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
         deadlineTimer = setTimeout(() => inject("hard deadline"), HARD_DEADLINE_MS);
       }
     }
-    if (chunkCount <= 5) debug(`chunk #${chunkCount} ${data.length}b head=${JSON.stringify(data.slice(0, 40))}`);
+    if (!pasteModeSeen && data.includes("\x1b[?2004h")) {
+      pasteModeSeen = true;
+      debug(`paste-mode-enable observed at chunk #${chunkCount} (${Date.now() - firstChunkAt}ms)`);
+    }
+    if (chunkCount <= 10) debug(`chunk #${chunkCount} ${data.length}b head=${JSON.stringify(data.slice(0, 200))}`);
     process.stdout.write(data);
 
     if (spec.prefillText && !injected) {
