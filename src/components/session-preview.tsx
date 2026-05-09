@@ -23,6 +23,7 @@ export function SessionPreview({
   width,
   emoji = true,
   showHash = false,
+  onRequestContinue,
 }: {
   messages: Message[];
   sessionId: string | null;
@@ -31,6 +32,7 @@ export function SessionPreview({
   width: number;
   emoji?: boolean;
   showHash?: boolean;
+  onRequestContinue?: (info: { targetUuid: string; targetRole: "user" | "assistant"; userText?: string }) => void;
 }) {
   const lang = useLang();
   // pinToBottom: while true, the viewport sticks to the latest message and the
@@ -43,6 +45,10 @@ export function SessionPreview({
   const [searchValue, setSearchValue] = useState("");
   const [committedQuery, setCommittedQuery] = useState("");
   const [matchIndex, setMatchIndex] = useState<number>(-1);
+  // continueOpen: when true, the bottom shows a "↪ Continue conversation"
+  // confirm row and ordinary preview navigation is suppressed. Enter confirms,
+  // Esc cancels.
+  const [continueOpen, setContinueOpen] = useState(false);
 
   // Track the query|messages.length pair for which we last placed the initial
   // matchIndex. Using a ref avoids adding matchIndex to the dep array (which
@@ -66,6 +72,7 @@ export function SessionPreview({
     setSearchValue("");
     setCommittedQuery("");
     setMatchIndex(-1);
+    setContinueOpen(false);
     lastInitKey.current = null;
     lastAnchorRef.current = null;
     // Wipe the buffer so the spinner shows for the new session, instead of
@@ -79,7 +86,10 @@ export function SessionPreview({
   // so the user always sees what they searched for and which match is current.
   // When shown, it's the bar + a thin separator rule = 2 rows.
   const showSearchRow = searchOpen || committedQuery !== "";
-  const viewportHeight = Math.max(1, height - 1 - (showSearchRow ? 2 : 0));
+  // Both rows take 2 lines (separator + content). Reserve room for whichever
+  // are visible so the message list isn't clipped from the bottom.
+  const extraRows = (showSearchRow ? 2 : 0) + (continueOpen ? 2 : 0);
+  const viewportHeight = Math.max(1, height - 1 - extraRows);
   const query = committedQuery || (searchOpen ? searchValue : "");
 
   const effectiveCursor = pinToBottom ? lastIdx : Math.min(cursor, lastIdx);
@@ -299,6 +309,26 @@ export function SessionPreview({
     if (!focused) return;
     if (searchOpen) return;
 
+    // Continue-conversation footer mode: suppress all preview navigation;
+    // Enter confirms (calls back), Esc cancels.
+    if (continueOpen) {
+      if (key.return) {
+        const target = pinToBottom ? lastIdx : effectiveCursor;
+        const msg = messages[target];
+        if (msg && (msg.role === "user" || msg.role === "assistant") && typeof msg.uuid === "string") {
+          onRequestContinue?.({
+            targetUuid: msg.uuid,
+            targetRole: msg.role,
+            userText: msg.role === "user" ? msg.content : undefined,
+          });
+        }
+        setContinueOpen(false);
+      } else if (key.escape) {
+        setContinueOpen(false);
+      }
+      return;
+    }
+
     // searchOpen is already guarded above; just check the committed query.
     const inAfterglow = committedQuery !== "";
     const isOrdinaryNav =
@@ -344,6 +374,12 @@ export function SessionPreview({
       const target = pinToBottom ? lastIdx : effectiveCursor;
       if (key.return) {
         const role = messages[target]?.role;
+        // Enter on user/assistant rows opens the continue-conversation footer.
+        // Tool rows still toggle expansion as before.
+        if (role === "user" || role === "assistant") {
+          if (typeof messages[target]?.uuid === "string") setContinueOpen(true);
+          return;
+        }
         if (role !== "tool_use" && role !== "tool_result") return;
       }
       setExpanded(prev => {
@@ -431,6 +467,16 @@ export function SessionPreview({
           <Text key={i} wrap="truncate">{line || " "}</Text>
         ))}
       </Box>
+      {continueOpen && (
+        <Box flexDirection="column" flexShrink={0}>
+          <Text dimColor>{"─".repeat(width)}</Text>
+          <Text wrap="truncate">
+            <Text color="cyan" bold>{t(lang, "continue.footer_label")}</Text>
+            <Text>   </Text>
+            <Text dimColor>{t(lang, "continue.confirm_hint")}</Text>
+          </Text>
+        </Box>
+      )}
       {(showOverflowHint || showHash) && (
         <Box flexShrink={0}>
           <Text dimColor>

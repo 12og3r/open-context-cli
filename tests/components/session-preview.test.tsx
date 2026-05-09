@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, mock } from "bun:test";
 import React from "react";
 import { render } from "ink-testing-library";
 import { SessionPreview } from "../../src/components/session-preview.tsx";
@@ -367,5 +367,81 @@ describe("SessionPreview", () => {
     await tick();
     const out = lastFrame() ?? "";
     expect(out).toContain("no matches");
+  });
+
+  test("Enter on assistant message opens continue footer; second Enter fires onRequestContinue with target", async () => {
+    const onRequest = mock((_info: { targetUuid: string; targetRole: "user" | "assistant"; userText?: string }) => {});
+    const messages: Message[] = [
+      { role: "user", content: "msg one", timestamp: new Date(0), uuid: "u1", raw: {} },
+      { role: "assistant", content: "reply one", timestamp: new Date(0), uuid: "a1", raw: {} },
+    ];
+    const { stdin, lastFrame } = render(
+      <SessionPreview
+        messages={messages}
+        sessionId="s"
+        focused={true}
+        height={10}
+        width={50}
+        emoji={false}
+        onRequestContinue={onRequest}
+      />
+    );
+    await tick();
+    stdin.write("\r");                 // first Enter — open footer
+    await tick();
+    expect(lastFrame() ?? "").toContain("Continue conversation");
+    stdin.write("\r");                 // confirm
+    await tick();
+    expect(onRequest).toHaveBeenCalledTimes(1);
+    const arg = onRequest.mock.calls[0]?.[0];
+    expect(arg).toMatchObject({ targetUuid: "a1", targetRole: "assistant" });
+  });
+
+  test("Enter on user message exposes content as userText", async () => {
+    const onRequest = mock((_info: { targetUuid: string; targetRole: "user" | "assistant"; userText?: string }) => {});
+    const messages: Message[] = [
+      { role: "user", content: "the very last user msg", timestamp: new Date(0), uuid: "uX", raw: {} },
+    ];
+    const { stdin } = render(
+      <SessionPreview
+        messages={messages}
+        sessionId="s"
+        focused={true}
+        height={8}
+        width={50}
+        emoji={false}
+        onRequestContinue={onRequest}
+      />
+    );
+    await tick();
+    stdin.write("\r");
+    await tick();
+    stdin.write("\r");
+    await tick();
+    expect(onRequest).toHaveBeenCalledTimes(1);
+    const arg = onRequest.mock.calls[0]?.[0];
+    expect(arg).toMatchObject({
+      targetUuid: "uX",
+      targetRole: "user",
+      userText: "the very last user msg",
+    });
+  });
+
+  test("Esc closes the continue footer without firing the request", async () => {
+    const onRequest = mock(() => {});
+    const messages: Message[] = [
+      { role: "user", content: "hi", timestamp: new Date(0), uuid: "u1", raw: {} },
+    ];
+    const { stdin, lastFrame } = render(
+      <SessionPreview messages={messages} sessionId="s" focused={true} height={6} width={40} emoji={false} onRequestContinue={onRequest} />
+    );
+    await tick();
+    stdin.write("\r");
+    await tick();
+    expect(lastFrame() ?? "").toContain("Continue conversation");
+    stdin.write("\x1b");           // Esc
+    await tick();
+    expect(lastFrame() ?? "").not.toContain("Continue conversation");
+    expect(onRequest).not.toHaveBeenCalled();
   });
 });
