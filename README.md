@@ -127,22 +127,17 @@ bun run build        # bundle to dist/cli.js
 Tests use `ink-testing-library` for components and fixture `.jsonl` files in
 `tests/fixtures/` for the provider layer.
 
-`@lydell/node-pty` is a native dependency. Prebuilt binaries exist for
-darwin-x64, darwin-arm64, linux-x64, linux-arm64, and win-x64; if your
-platform isn't covered, `npm install` will fall back to `node-gyp`, which
-needs Python 3 and a C++ toolchain on PATH.
+### PTY runtime selection
 
-### Continue conversation under `bun run dev`
+The continue-conversation feature spawns `claude` inside a PTY. Two libraries
+are bundled and chosen at runtime:
 
-The continue-conversation feature spawns `claude` inside a PTY via
-`@lydell/node-pty`'s `spawn-helper`. Under Bun the helper's parent/child
-handshake doesn't complete and the spawn hangs indefinitely. This only
-affects `bun run dev`; the published binary (`open-context`, run via Node)
-is fine. While developing, exercise the feature with the built artifact:
-
-```bash
-bun run build && node dist/cli.js
-```
+- **Node:** `@lydell/node-pty` (prebuilt for darwin-x64, darwin-arm64,
+  linux-x64, linux-arm64, win-x64; falls back to `node-gyp` requiring
+  Python 3 + a C++ toolchain on PATH).
+- **Bun:** `bun-pty` (Rust + `bun:ffi`; ships its own prebuilt natives).
+  Necessary because Bun's child-process semantics don't complete
+  `@lydell/node-pty`'s spawn-helper handshake.
 
 To get diagnostic traces of the launch path, run with
 `OPEN_CONTEXT_DEBUG=1`; events will append to

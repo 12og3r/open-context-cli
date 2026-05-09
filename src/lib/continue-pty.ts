@@ -12,21 +12,68 @@ export interface PtyRunSpec {
 
 const debug = (s: string) => trace("pty", s);
 
+// Minimum PTY surface we need. Both @lydell/node-pty and bun-pty expose
+// this exact shape (modulo a few options node-pty marks optional that
+// bun-pty marks required — handled at the call site).
+interface MinIPty {
+  readonly pid: number;
+  onData(listener: (data: string) => void): { dispose(): void };
+  onExit(listener: (event: { exitCode: number; signal?: number | string }) => void): { dispose(): void };
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+}
+
+interface MinPtyModule {
+  spawn(file: string, args: string[], options: {
+    name: string;
+    cols: number;
+    rows: number;
+    cwd: string;
+    env: Record<string, string>;
+  }): MinIPty;
+}
+
+// Pick the runtime-appropriate PTY library. Bun's child-process semantics
+// don't complete @lydell/node-pty's spawn-helper handshake (the helper
+// hangs before exec'ing the target), so under Bun we need bun-pty's
+// Rust+ffi implementation. Under Node either works; @lydell/node-pty
+// is the conservative choice with widest prebuilt coverage.
+async function loadPtyModule(): Promise<MinPtyModule> {
+  const isBun = typeof (globalThis as { Bun?: unknown }).Bun !== "undefined"
+    || typeof process.versions?.bun === "string";
+  if (isBun) {
+    debug("loading bun-pty (Bun runtime detected)");
+    return (await import("bun-pty")) as unknown as MinPtyModule;
+  }
+  debug("loading @lydell/node-pty (Node runtime)");
+  return (await import("@lydell/node-pty")) as unknown as MinPtyModule;
+}
+
+function stringifyEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+  // bun-pty's IPtyForkOptions.env rejects `undefined` values that
+  // process.env's type allows. Strip them.
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (typeof v === "string") out[k] = v;
+  }
+  return out;
+}
+
 // Spawn `claude --resume <id>` via node-pty, attach stdio, optionally inject
 // `prefillText` as a bracketed paste (~80ms after the first stdout chunk so
 // the Ink UI inside claude has had a chance to draw its prompt). Resolves
 // with the child's exit code.
 export async function runPty(spec: PtyRunSpec): Promise<number> {
-  debug("import @lydell/node-pty");
-  const ptyMod = await import("@lydell/node-pty");
-  debug("import ok");
+  const ptyMod = await loadPtyModule();
+  debug("pty module loaded");
   const cols = process.stdout.columns ?? 100;
   const rows = process.stdout.rows ?? 30;
-  const env = { ...process.env, TERM: process.env.TERM ?? "xterm-256color" };
+  const term = process.env.TERM ?? "xterm-256color";
+  const env = stringifyEnv({ ...process.env, TERM: term });
 
   debug(`spawn claude --resume ${spec.resumeId.slice(0, 8)} cwd=${spec.cwd}`);
   const child = ptyMod.spawn("claude", ["--resume", spec.resumeId], {
-    name: env.TERM,
+    name: term,
     cols, rows,
     cwd: spec.cwd,
     env,
