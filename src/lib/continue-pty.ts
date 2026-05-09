@@ -61,13 +61,23 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
     child.write(PASTE_START + spec.prefillText + PASTE_END);
   };
 
-  // Inject the bracketed paste once claude's TUI looks settled. "Settled"
-  // means: no new stdout chunks for IDLE_MS, or HARD_DEADLINE_MS have elapsed
-  // since the very first chunk — whichever comes first. Either way the
-  // injection happens exactly once.
+  // Inject the bracketed paste once claude's TUI is actually mounted. We
+  // watch for `\x1b[?1049h` — the "switch to alternate screen" sequence
+  // that claude emits right before painting its TUI. Idle detection only
+  // starts AFTER that, so we don't inject during the terminal capability
+  // negotiation phase (where the input box doesn't exist yet).
+  //
+  // Sequence on a real run looks roughly like:
+  //   t=0       chunk #1  cursor save/restore + show cursor
+  //   t=6ms     chunk #3  \x1b[?2004h (paste mode on)  ← paste mode IS on
+  //   t=320ms   <silence — looks "idle" but claude hasn't mounted yet>
+  //   t=1550ms  chunk #7  \x1b[?1049h (enter alt screen)  ← TUI mount
+  //   t=1580ms  chunk #8+ session content rendered
+  //   t=~1900ms idle settles → safe to inject
   const IDLE_MS = 300;
-  const HARD_DEADLINE_MS = 2000;
+  const HARD_DEADLINE_MS = 5000;
   let firstChunkAt = 0;
+  let altScreenAt = 0;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
   let chunkCount = 0;
@@ -86,12 +96,16 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
       pasteModeSeen = true;
       debug(`paste-mode-enable observed at chunk #${chunkCount} (${Date.now() - firstChunkAt}ms)`);
     }
+    if (altScreenAt === 0 && data.includes("\x1b[?1049h")) {
+      altScreenAt = Date.now();
+      debug(`alt-screen-enter observed at chunk #${chunkCount} (${altScreenAt - firstChunkAt}ms)`);
+    }
     if (chunkCount <= 10) debug(`chunk #${chunkCount} ${data.length}b head=${JSON.stringify(data.slice(0, 200))}`);
     process.stdout.write(data);
 
-    if (spec.prefillText && !injected) {
+    if (spec.prefillText && !injected && altScreenAt !== 0) {
       if (idleTimer) clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => inject("idle"), IDLE_MS);
+      idleTimer = setTimeout(() => inject("idle after alt-screen"), IDLE_MS);
     }
   });
 
