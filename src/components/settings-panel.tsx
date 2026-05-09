@@ -64,6 +64,25 @@ function buildFields(lang: Lang): FieldDef[] {
         },
       ],
     },
+    {
+      key: "continueLaunchMode",
+      title: t(lang, "settings.launch_mode.title"),
+      options: [
+        {
+          value: "reuse-current",
+          label: t(lang, "settings.launch_mode.option_reuse"),
+          description: t(lang, "settings.launch_mode.option_reuse_desc"),
+        },
+        {
+          value: "new-window",
+          label: t(lang, "settings.launch_mode.option_new_window") +
+            (process.platform === "darwin"
+              ? ""
+              : ` (${t(lang, "settings.launch_mode.unsupported_note")})`),
+          description: t(lang, "settings.launch_mode.option_new_window_desc"),
+        },
+      ],
+    },
   ];
 }
 
