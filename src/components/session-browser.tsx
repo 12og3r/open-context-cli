@@ -5,9 +5,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { Box, Text, useInput, useStdout } from "ink";
 import Spinner from "ink-spinner";
-import type { SessionMeta, SessionProvider } from "../providers/types.ts";
+import type { SessionMeta } from "../providers/types.ts";
+import { getProviderForSource } from "../providers/index.ts";
 import type { ContinueRequest } from "../lib/continue-types.ts";
-import type { SessionStatus } from "../app.tsx";
+import type { SessionStatusBySource } from "../lib/session-status.ts";
 import { decodeProjectPath } from "../lib/decode-project-path.ts";
 import { SessionList } from "./session-list.tsx";
 import { SessionPreview } from "./session-preview.tsx";
@@ -28,22 +29,24 @@ type Focus = "list" | "preview" | "feature-bar" | "settings" | "delete-confirm";
 type RightView = "preview" | "settings" | "delete-confirm";
 
 export function SessionBrowser({
-  provider,
   sessions,
-  sessionStatus,
+  sessionStatusBySource,
   emoji,
   settings,
   updateSetting,
+  defaultClaudeDir,
+  defaultCodexDir,
   onQuit,
   onSessionRemoved,
   onRequestContinue,
 }: {
-  provider: SessionProvider;
   sessions: SessionMeta[];
-  sessionStatus: SessionStatus;
+  sessionStatusBySource: SessionStatusBySource;
   emoji: boolean;
   settings: Settings;
   updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
+  defaultClaudeDir: string;
+  defaultCodexDir: string;
   onQuit: () => void;
   onSessionRemoved?: (id: string) => void;
   onRequestContinue?: (req: ContinueRequest) => void;
@@ -66,11 +69,13 @@ export function SessionBrowser({
 
   // When sessions can't be found, route the user straight to the settings
   // panel so they can fix the path. Otherwise start on the list as usual.
+  const noSourceOk = !Object.values(sessionStatusBySource).some(s => s === "ok");
+
   const [focus, setFocus] = useState<Focus>(
-    sessionStatus === "missing" ? "settings" : "list",
+    noSourceOk ? "settings" : "list",
   );
   const [rightView, setRightView] = useState<RightView>(
-    sessionStatus === "missing" ? "settings" : "preview",
+    noSourceOk ? "settings" : "preview",
   );
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [featureIdx, setFeatureIdx] = useState(0);
@@ -88,7 +93,14 @@ export function SessionBrowser({
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const selected = sessions[Math.min(selectedIdx, sessions.length - 1)] ?? null;
-  const detail = useSessionDetail(provider, selected);
+  // Resolve the provider for the currently selected session by its source
+  // tag so loadSession parses with the right schema. memoized so identity
+  // is stable across re-renders that don't change the source.
+  const selectedProvider = useMemo(
+    () => selected ? getProviderForSource(selected.source) : null,
+    [selected],
+  );
+  const detail = useSessionDetail(selectedProvider, selected);
 
   // Apply the user's display-mode preference at this layer so the preview's
   // cursor / match logic operates on the filtered array. Memoized so toggling
@@ -299,8 +311,9 @@ export function SessionBrowser({
               focused={focus === "settings"}
               width={rightInnerWidth}
               height={innerHeight}
-              defaultSessionsDir={provider.defaultPaths[0] ?? ""}
-              sessionStatus={sessionStatus}
+              defaultClaudeDir={defaultClaudeDir}
+              defaultCodexDir={defaultCodexDir}
+              sessionStatusBySource={sessionStatusBySource}
             />
           ) : rightView === "delete-confirm" && deleteTarget ? (
             <DeleteConfirm
@@ -326,6 +339,7 @@ export function SessionBrowser({
                 <SessionPreview
                   messages={visibleMessages}
                   sessionId={selected?.id ?? null}
+                  source={selected?.source ?? null}
                   focused={previewFocused}
                   height={innerHeight}
                   width={rightInnerWidth}
@@ -342,19 +356,26 @@ export function SessionBrowser({
                       return { ok: false, error: t(lang, "continue.error_source_missing") };
                     }
 
-                    // Prefer the cwd recorded inside the JSONL (unambiguous);
-                    // fall back to decoding the slug if older sessions don't
-                    // have one captured. The slug-based decode is lossy when
-                    // a directory name contains "-".
-                    const slug = path.basename(path.dirname(selected.filePath));
-                    const sessionCwd = selected.cwd || decodeProjectPath(slug);
+                    const isCodex = selected.source === "codex";
 
-                    // Project directory missing: recoverable. First confirm
-                    // returns recoverable=force-cwd so preview can offer
-                    // (force); the next confirm arrives with info.force=true
-                    // and we launch in process.cwd() instead.
+                    // Codex sessions store cwd directly in session_meta;
+                    // claude sessions either record it on each entry or we
+                    // decode it from the slug (lossy when a path segment
+                    // contains "-").
+                    let sessionCwd: string | undefined;
+                    if (isCodex) {
+                      sessionCwd = selected.cwd;
+                    } else {
+                      const slug = path.basename(path.dirname(selected.filePath));
+                      sessionCwd = selected.cwd || decodeProjectPath(slug);
+                    }
+
+                    // Project directory missing: recoverable for claude
+                    // (we re-anchor the forked JSONL to process.cwd()).
+                    // For codex we just let `codex resume` start in
+                    // process.cwd() — no fork, no rewrite, no force prompt.
                     let forceCwd: string | undefined;
-                    if (sessionCwd && !fsSync.existsSync(sessionCwd)) {
+                    if (!isCodex && sessionCwd && !fsSync.existsSync(sessionCwd)) {
                       if (!info.force) {
                         return {
                           ok: false,
@@ -365,16 +386,25 @@ export function SessionBrowser({
                       forceCwd = process.cwd();
                     }
 
-                    const claudeProbe = spawnSync(
+                    const cliBinary = isCodex ? "codex" : "claude";
+                    const probe = spawnSync(
                       process.platform === "win32" ? "where" : "which",
-                      ["claude"],
+                      [cliBinary],
                       { stdio: "ignore" },
                     );
-                    if (claudeProbe.status !== 0) {
-                      return { ok: false, error: t(lang, "continue.error_no_claude") };
+                    if (probe.status !== 0) {
+                      return {
+                        ok: false,
+                        error: t(
+                          lang,
+                          isCodex ? "continue.error_no_codex" : "continue.error_no_claude",
+                        ),
+                      };
                     }
 
                     onRequestContinue({
+                      source: selected.source,
+                      sessionId: selected.id,
                       sourcePath: selected.filePath,
                       targetUuid: info.targetUuid,
                       targetRole: info.targetRole,

@@ -4,25 +4,37 @@ import { Box, Text, useApp } from "ink";
 import Spinner from "ink-spinner";
 import path from "node:path";
 import os from "node:os";
-import fs from "node:fs/promises";
-import { getProvider } from "./providers/index.ts";
-import type { SessionMeta } from "./providers/types.ts";
+import {
+  ALL_SOURCES,
+  getProviderForSource,
+  listAllSessions,
+} from "./providers/index.ts";
+import type { SessionMeta, Source } from "./providers/types.ts";
 import { SessionBrowser } from "./components/session-browser.tsx";
 import { LangProvider } from "./hooks/use-lang.ts";
 import { useSettings } from "./hooks/use-settings.ts";
 import { t } from "./lib/i18n.ts";
 import type { ContinueRequest } from "./lib/continue-types.ts";
 import { trace } from "./lib/debug-trace.ts";
+import { enabledSourcesFromSettings } from "./lib/settings.ts";
+import {
+  deriveSessionStatusBySource,
+  type SessionStatusBySource,
+} from "./lib/session-status.ts";
+import { claudeProjectsDir } from "./lib/claude-paths.ts";
+import { codexSessionsDir } from "./lib/codex-paths.ts";
 
-export type SessionStatus = "ok" | "missing";
+type Roots = Record<Source, string>;
+type Enabled = Record<Source, boolean>;
 
 type AppState =
-  | { kind: "scanning"; root: string }
+  | { kind: "scanning"; roots: Roots; enabled: Enabled }
   | {
       kind: "browser";
-      root: string;
+      roots: Roots;
+      enabled: Enabled;
       sessions: SessionMeta[];
-      sessionStatus: SessionStatus;
+      sessionStatusBySource: SessionStatusBySource;
     };
 
 export function App({
@@ -34,69 +46,85 @@ export function App({
   emoji?: boolean;
   onRequestContinue?: (req: ContinueRequest) => void;
 }) {
-  const provider = useMemo(() => getProvider(), []);
   const { exit } = useApp();
   const { settings, update: updateSetting } = useSettings();
   const lang = settings.language;
 
-  // Resolution order: explicit CLI flag > saved setting > provider default.
-  // The saved setting is treated as a soft preference — empty string means
-  // "fall back to default", and any non-empty value is taken at face value
-  // (validation is the scanner's job, not ours).
-  const effectiveRoot = useMemo(() => {
-    const raw = initialPath || settings.sessionsDir || provider.defaultPaths[0]!;
-    return expandHome(raw);
-  }, [initialPath, settings.sessionsDir, provider]);
+  // CLI --path is a Claude-only override (Codex's YYYY/MM/DD layout means
+  // an arbitrary `--path` rarely makes sense for it). When set, we point
+  // Claude at that path and disable Codex entirely so the user gets the
+  // single-path browser they asked for.
+  const enabled: Enabled = useMemo(() => {
+    if (initialPath) return { "claude-code": true, "codex": false };
+    return enabledSourcesFromSettings(settings);
+  }, [initialPath, settings.showClaudeCode, settings.showCodex]);
 
-  const [state, setState] = useState<AppState>(() => {
-    return { kind: "scanning", root: effectiveRoot };
-  });
+  // Per-source roots. Resolution order: CLI flag (Claude only) > saved
+  // setting > provider default.
+  const roots: Roots = useMemo(() => ({
+    "claude-code": expandHome(
+      initialPath || settings.sessionsDir || claudeProjectsDir(),
+    ),
+    "codex": expandHome(settings.codexSessionsDir || codexSessionsDir()),
+  }), [initialPath, settings.sessionsDir, settings.codexSessionsDir]);
 
-  // Re-scan when the resolved root changes (e.g. user edits sessionsDir in
-  // the settings panel). We only restart if it's actually a different root —
-  // settings load asynchronously, so the same path arriving twice during
+  const [state, setState] = useState<AppState>(() => ({
+    kind: "scanning", roots, enabled,
+  }));
+
+  // Re-scan when the resolved roots or enabled sources change. Settings
+  // hydrate asynchronously, so the same shape arriving twice during
   // hydration shouldn't tear down a freshly-loaded list.
   useEffect(() => {
     setState(prev => {
-      if (prev.kind === "scanning" && prev.root === effectiveRoot) return prev;
-      if (prev.kind === "browser" && prev.root === effectiveRoot) return prev;
-      return { kind: "scanning", root: effectiveRoot };
+      if (sameRoots(prev.roots, roots) && sameEnabled(prev.enabled, enabled)) {
+        return prev;
+      }
+      return { kind: "scanning", roots, enabled };
     });
-  }, [effectiveRoot]);
+  }, [roots, enabled]);
 
   useEffect(() => {
     if (state.kind !== "scanning") return;
     let cancelled = false;
     (async () => {
-      const root = state.root;
-      const ok = await directoryHasJsonl(root);
-      if (cancelled) return;
-      if (!ok) {
-        setState({ kind: "browser", root, sessions: [], sessionStatus: "missing" });
-        return;
-      }
       try {
-        const sessions = await provider.listSessions(root);
+        const sessions = await listAllSessions({
+          enabled: state.enabled,
+          rootForSource: (s) => state.roots[s],
+        });
         if (cancelled) return;
         setState({
           kind: "browser",
-          root,
+          roots: state.roots,
+          enabled: state.enabled,
           sessions,
-          sessionStatus: sessions.length === 0 ? "missing" : "ok",
+          sessionStatusBySource: deriveSessionStatusBySource(state.enabled, sessions),
         });
       } catch {
         if (cancelled) return;
-        setState({ kind: "browser", root, sessions: [], sessionStatus: "missing" });
+        setState({
+          kind: "browser",
+          roots: state.roots,
+          enabled: state.enabled,
+          sessions: [],
+          sessionStatusBySource: deriveSessionStatusBySource(state.enabled, []),
+        });
       }
     })();
     return () => { cancelled = true; };
-  }, [state, provider]);
+  }, [state]);
 
   if (state.kind === "scanning") {
+    // We can show only one path in the spinner; pick the first enabled root.
+    // Consistent with the previous single-path message even when both
+    // sources are scanning concurrently.
+    const firstRoot = ALL_SOURCES.find(s => state.enabled[s]);
+    const root = firstRoot ? state.roots[firstRoot] : "";
     return (
       <LangProvider value={lang}>
         <Box>
-          <Spinner /><Text> {t(lang, "loading.scanning", { root: state.root })}</Text>
+          <Spinner /><Text> {t(lang, "loading.scanning", { root })}</Text>
         </Box>
       </LangProvider>
     );
@@ -104,12 +132,13 @@ export function App({
   return (
     <LangProvider value={lang}>
       <SessionBrowser
-        provider={provider}
         sessions={state.sessions}
-        sessionStatus={state.sessionStatus}
+        sessionStatusBySource={state.sessionStatusBySource}
         emoji={emoji}
         settings={settings}
         updateSetting={updateSetting}
+        defaultClaudeDir={claudeProjectsDir()}
+        defaultCodexDir={codexSessionsDir()}
         onQuit={() => exit()}
         onSessionRemoved={(id) => {
           setState(prev => {
@@ -118,12 +147,12 @@ export function App({
             return {
               ...prev,
               sessions: next,
-              sessionStatus: next.length === 0 ? "missing" : "ok",
+              sessionStatusBySource: deriveSessionStatusBySource(prev.enabled, next),
             };
           });
         }}
         onRequestContinue={(req) => {
-          trace("app", `onRequestContinue mode=${req.launchMode} role=${req.targetRole}`);
+          trace("app", `onRequestContinue mode=${req.launchMode} role=${req.targetRole} source=${req.source}`);
           if (req.launchMode === "new-window") {
             // The new window is a separate process — there's no reason to
             // also tear down this CLI. Fire the launch async so the preview
@@ -153,23 +182,14 @@ function expandHome(p: string): string {
   return p;
 }
 
-async function directoryHasJsonl(root: string): Promise<boolean> {
-  try {
-    const stat = await fs.stat(root);
-    if (stat.isFile()) return root.endsWith(".jsonl");
-    if (!stat.isDirectory()) return false;
-    const entries = await fs.readdir(root);
-    for (const e of entries) {
-      const full = path.join(root, e);
-      const s = await fs.stat(full);
-      if (s.isFile() && e.endsWith(".jsonl")) return true;
-      if (s.isDirectory()) {
-        const inner = await fs.readdir(full);
-        if (inner.some(x => x.endsWith(".jsonl"))) return true;
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
+function sameRoots(a: Roots, b: Roots): boolean {
+  return ALL_SOURCES.every(s => a[s] === b[s]);
 }
+
+function sameEnabled(a: Enabled, b: Enabled): boolean {
+  return ALL_SOURCES.every(s => a[s] === b[s]);
+}
+
+// Re-export so the SessionBrowser can resolve providers per session
+// without re-importing from providers/index.ts.
+export { getProviderForSource };

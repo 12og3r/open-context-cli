@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import type { Settings, DisplayMode } from "../lib/settings.ts";
-import type { SessionStatus } from "../app.tsx";
+import type { SessionStatusBySource } from "../lib/session-status.ts";
 import { t, type Lang } from "../lib/i18n.ts";
 import { useLang } from "../hooks/use-lang.ts";
 
@@ -10,41 +10,105 @@ const ACCENT = "cyan";
 const DANGER = "red";
 const OK = "green";
 
+// Setting keys that are edited via the path-input UX (text box + restore
+// default button). Anything else is rendered as an options field.
+type PathSettingsKey = "sessionsDir" | "codexSessionsDir";
+const PATH_SETTING_KEYS: readonly PathSettingsKey[] = [
+  "sessionsDir",
+  "codexSessionsDir",
+] as const;
+
 type OptionsFieldDef = {
-  [K in Exclude<keyof Settings, "sessionsDir">]: {
+  [K in Exclude<keyof Settings, PathSettingsKey>]: {
     kind: "options";
     key: K;
     title: string;
     options: Array<{ value: Settings[K]; label: string; description: string }>;
   };
-}[Exclude<keyof Settings, "sessionsDir">];
+}[Exclude<keyof Settings, PathSettingsKey>];
 
 type PathFieldDef = {
   kind: "path";
-  key: "sessionsDir";
+  key: PathSettingsKey;
   title: string;
   description: string;
   defaultPath: string;
   defaultLabel: string;
   restoreLabel: string;
   placeholder: string;
+  // Only the first path field is the one whose status badge ("Sessions
+  // found" / "missing") is meaningful — that's the Claude one. Codex shows
+  // no status badge to keep the panel uncluttered.
+  showStatus: boolean;
 };
 
 type FieldDef = OptionsFieldDef | PathFieldDef;
 
-function buildFields(lang: Lang, defaultSessionsDir: string): FieldDef[] {
+function buildFields(
+  lang: Lang,
+  defaultClaudeDir: string,
+  defaultCodexDir: string,
+): FieldDef[] {
   return [
     {
       kind: "path",
       key: "sessionsDir",
       title: t(lang, "settings.sessions_dir.title"),
       description: t(lang, "settings.sessions_dir.description"),
-      defaultPath: defaultSessionsDir,
+      defaultPath: defaultClaudeDir,
       defaultLabel: t(lang, "settings.sessions_dir.default_label", {
-        path: defaultSessionsDir || "—",
+        path: defaultClaudeDir || "—",
       }),
       restoreLabel: t(lang, "settings.sessions_dir.restore"),
       placeholder: t(lang, "settings.sessions_dir.placeholder"),
+      showStatus: true,
+    },
+    {
+      kind: "path",
+      key: "codexSessionsDir",
+      title: t(lang, "settings.codex_sessions_dir.title"),
+      description: t(lang, "settings.codex_sessions_dir.description"),
+      defaultPath: defaultCodexDir,
+      defaultLabel: t(lang, "settings.sessions_dir.default_label", {
+        path: defaultCodexDir || "—",
+      }),
+      restoreLabel: t(lang, "settings.sessions_dir.restore"),
+      placeholder: t(lang, "settings.sessions_dir.placeholder"),
+      showStatus: false,
+    },
+    {
+      kind: "options",
+      key: "showClaudeCode",
+      title: t(lang, "settings.show_source.claude_title"),
+      options: [
+        {
+          value: true,
+          label: t(lang, "settings.show_source.on"),
+          description: t(lang, "settings.show_source.on_desc"),
+        },
+        {
+          value: false,
+          label: t(lang, "settings.show_source.off"),
+          description: t(lang, "settings.show_source.off_desc"),
+        },
+      ],
+    },
+    {
+      kind: "options",
+      key: "showCodex",
+      title: t(lang, "settings.show_source.codex_title"),
+      options: [
+        {
+          value: true,
+          label: t(lang, "settings.show_source.on"),
+          description: t(lang, "settings.show_source.on_desc"),
+        },
+        {
+          value: false,
+          label: t(lang, "settings.show_source.off"),
+          description: t(lang, "settings.show_source.off_desc"),
+        },
+      ],
     },
     {
       kind: "options",
@@ -122,27 +186,31 @@ function buildFields(lang: Lang, defaultSessionsDir: string): FieldDef[] {
 
 type PathSubCursor = "input" | "restore";
 
+type PathDrafts = Record<PathSettingsKey, string>;
+
 export function SettingsPanel({
   settings,
   onChange,
   focused,
   width,
   height,
-  defaultSessionsDir,
-  sessionStatus,
+  defaultClaudeDir,
+  defaultCodexDir,
+  sessionStatusBySource,
 }: {
   settings: Settings;
   onChange: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   focused: boolean;
   width: number;
   height: number;
-  defaultSessionsDir: string;
-  sessionStatus: SessionStatus;
+  defaultClaudeDir: string;
+  defaultCodexDir: string;
+  sessionStatusBySource: SessionStatusBySource;
 }) {
   const lang = useLang();
   const FIELDS = useMemo(
-    () => buildFields(lang, defaultSessionsDir),
-    [lang, defaultSessionsDir],
+    () => buildFields(lang, defaultClaudeDir, defaultCodexDir),
+    [lang, defaultClaudeDir, defaultCodexDir],
   );
   const [fieldIdx, setFieldIdx] = useState(0);
   // Per-field "option cursor" — independent of the applied value. Initialized
@@ -153,55 +221,60 @@ export function SettingsPanel({
   );
 
   // Sub-cursor for path-kind fields: which sub-element currently owns input.
-  // Reset to "input" whenever the path field is (re)entered, so typing works
+  // Reset to "input" whenever any path field is (re)entered, so typing works
   // immediately without a Tab.
   const [pathSubCursor, setPathSubCursor] = useState<PathSubCursor>("input");
 
-  // Local draft of the path value. Decoupled from settings.sessionsDir so we
-  // can debounce the rescan in app.tsx — the draft commits to settings only
-  // when the panel loses focus (i.e. user closes the panel via Esc or Enter).
-  const [pathDraft, setPathDraft] = useState(settings.sessionsDir);
-  const pathDraftRef = useRef(pathDraft);
+  // Local drafts of each path setting. Decoupled from settings so we can
+  // debounce the rescan in app.tsx — drafts commit to settings only when
+  // the panel closes (Esc / Enter), via the unmount cleanup below.
+  const [pathDrafts, setPathDrafts] = useState<PathDrafts>(() => ({
+    sessionsDir: settings.sessionsDir,
+    codexSessionsDir: settings.codexSessionsDir,
+  }));
+  const pathDraftsRef = useRef(pathDrafts);
   useEffect(() => {
-    pathDraftRef.current = pathDraft;
-  }, [pathDraft]);
+    pathDraftsRef.current = pathDrafts;
+  }, [pathDrafts]);
 
   // When the panel becomes focused, re-anchor the cursor on each field to
-  // whatever value is currently applied. That way leaving and re-entering the
-  // panel doesn't leave a stale cursor on a value the user never confirmed.
+  // whatever value is currently applied. That way leaving and re-entering
+  // the panel doesn't leave a stale cursor on a value the user never
+  // confirmed.
   useEffect(() => {
     if (focused) {
       setOptionCursor(initialCursor(FIELDS, settings));
-      setPathDraft(settings.sessionsDir);
+      setPathDrafts({
+        sessionsDir: settings.sessionsDir,
+        codexSessionsDir: settings.codexSessionsDir,
+      });
       setPathSubCursor("input");
     }
   }, [focused, settings, FIELDS]);
 
-  // Commit the path draft to settings when the panel goes away. Originally
-  // this ran on the focused-prop true→false transition, but the parent
-  // unmounts SettingsPanel synchronously on Enter/Esc (rightView flips to
-  // "preview"), so that effect never got to fire with focused=false and the
-  // draft was silently dropped. Using an unmount cleanup makes the commit
-  // reliable regardless of how the panel is closed.
-  //
-  // The cleanup runs after render, when the parent's setState has already
-  // queued setRightView("preview"). We need refs because the cleanup
-  // closes over its initial values — we want the latest draft, latest
-  // onChange, and latest applied sessionsDir at unmount time.
+  // Commit any path drafts whose current value differs from settings on
+  // unmount. The parent unmounts SettingsPanel synchronously when the user
+  // closes the panel (rightView flips to "preview"), so the focused-prop
+  // false transition never fires with the panel still mounted; using an
+  // unmount cleanup makes the commit reliable regardless of how the panel
+  // is closed.
   const onChangeRef = useRef(onChange);
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
-  const sessionsDirRef = useRef(settings.sessionsDir);
-  useEffect(() => { sessionsDirRef.current = settings.sessionsDir; }, [settings.sessionsDir]);
+  const settingsRef = useRef(settings);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
   useEffect(() => {
     return () => {
-      const draft = pathDraftRef.current;
-      if (draft !== sessionsDirRef.current) {
-        onChangeRef.current("sessionsDir", draft);
+      const drafts = pathDraftsRef.current;
+      const applied = settingsRef.current;
+      for (const key of PATH_SETTING_KEYS) {
+        if (drafts[key] !== applied[key]) {
+          onChangeRef.current(key, drafts[key]);
+        }
       }
     };
   }, []);
 
-  // Pin the sub-cursor back to "input" when the user moves to the path field
+  // Pin the sub-cursor back to "input" when the user moves to a path field
   // from elsewhere (so the next keystroke types into the input box).
   useEffect(() => {
     setPathSubCursor("input");
@@ -212,9 +285,9 @@ export function SettingsPanel({
   useInput((input, key) => {
     if (!focused) return;
 
-    // While the path input owns input, only handle field navigation + Tab.
-    // Everything else (typing, ←/→ within text) is delegated to ink-text-input
-    // via its `focus` prop.
+    // While a path input owns input, only handle field navigation + Tab.
+    // Everything else (typing, ←/→ within text) is delegated to
+    // ink-text-input via its `focus` prop.
     if (field.kind === "path" && pathSubCursor === "input") {
       if (key.upArrow) {
         setFieldIdx(i => Math.max(0, i - 1));
@@ -252,11 +325,11 @@ export function SettingsPanel({
 
     // field.kind === "path", pathSubCursor === "restore"
     if (input === " " || key.return) {
-      // Restore default: clear both the draft and the applied setting so the
-      // change takes effect immediately, and drop focus back into the input
-      // for the next edit.
-      setPathDraft("");
-      if (settings.sessionsDir !== "") onChange("sessionsDir", "");
+      // Restore default: clear both the draft and the applied setting so
+      // the change takes effect immediately, and drop focus back into the
+      // input for the next edit.
+      setPathDrafts(prev => ({ ...prev, [field.key]: "" }));
+      if (settings[field.key] !== "") onChange(field.key, "");
       setPathSubCursor("input");
     } else if (key.leftArrow || input === "h" || key.rightArrow || input === "l") {
       setPathSubCursor("input");
@@ -274,9 +347,9 @@ export function SettingsPanel({
   function applyCursor(f: OptionsFieldDef) {
     const idx = optionCursor[f.key] ?? 0;
     const next = f.options[idx]!;
-    // The OptionsFieldDef union ties f.key to the option's value type, but TS
-    // can't see through the parametrized callback signature; the cast below is
-    // safe because the runtime pair (key, value) always matches by construction.
+    // The OptionsFieldDef union ties f.key to the option's value type, but
+    // TS can't see through the parametrized callback signature; the cast
+    // below is safe because the runtime pair (key, value) always matches.
     (onChange as (k: string, v: unknown) => void)(f.key, next.value);
   }
 
@@ -287,10 +360,11 @@ export function SettingsPanel({
       </Box>
       {FIELDS.map((f, i) => {
         const fieldSelected = i === fieldIdx;
-        const showStatus = f.key === "sessionsDir";
-        const statusColor = sessionStatus === "ok" ? OK : DANGER;
+        const showStatus = f.kind === "path" && f.showStatus;
+        const claudeStatus = sessionStatusBySource["claude-code"];
+        const statusColor = claudeStatus === "ok" ? OK : DANGER;
         const statusKey =
-          sessionStatus === "ok"
+          claudeStatus === "ok"
             ? "settings.session_status.ok"
             : "settings.session_status.missing";
         return (
@@ -317,8 +391,10 @@ export function SettingsPanel({
             ) : (
               <PathRow
                 field={f}
-                draft={pathDraft}
-                onDraftChange={setPathDraft}
+                draft={pathDrafts[f.key]}
+                onDraftChange={(v) =>
+                  setPathDrafts(prev => ({ ...prev, [f.key]: v }))
+                }
                 subCursor={pathSubCursor}
                 fieldFocused={fieldSelected && focused}
               />
