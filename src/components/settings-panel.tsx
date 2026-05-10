@@ -39,7 +39,6 @@ type SourceFieldDef = {
   pathKey: PathSettingsKey;
   toggleKey: ShowSourceKey;
   title: string;
-  description: string;
   defaultLabel: string;
   restoreLabel: string;
   placeholder: string;
@@ -59,7 +58,6 @@ function buildFields(
       pathKey: "sessionsDir",
       toggleKey: "showClaudeCode",
       title: t(lang, "settings.sessions_dir.title"),
-      description: t(lang, "settings.sessions_dir.description"),
       defaultLabel: t(lang, "settings.sessions_dir.default_label", {
         path: defaultClaudeDir || "—",
       }),
@@ -72,7 +70,6 @@ function buildFields(
       pathKey: "codexSessionsDir",
       toggleKey: "showCodex",
       title: t(lang, "settings.codex_sessions_dir.title"),
-      description: t(lang, "settings.codex_sessions_dir.description"),
       defaultLabel: t(lang, "settings.sessions_dir.default_label", {
         path: defaultCodexDir || "—",
       }),
@@ -461,7 +458,7 @@ function SourceRow({
 
   return (
     <>
-      <Box flexDirection="row" justifyContent="space-between" width={width}>
+      <Box flexDirection="row" justifyContent="space-between" width={width} flexShrink={0}>
         <Box>
           <Text color={fieldFocused ? ACCENT : undefined} bold={fieldFocused}>
             {fieldFocused ? "› " : "  "}{field.title}
@@ -476,12 +473,13 @@ function SourceRow({
           />
         </Box>
       </Box>
-      <Box marginLeft={2}>
+      <Box marginLeft={2} flexShrink={0}>
         <StatusBadge status={status} lang={lang} />
-        <Text dimColor>{" · "}</Text>
+      </Box>
+      <Box marginLeft={2} flexShrink={0}>
         <Text dimColor>{field.defaultLabel}</Text>
       </Box>
-      <Box marginLeft={2} flexDirection="row">
+      <Box marginLeft={2} flexDirection="row" flexShrink={0}>
         <Text color={inputFocused ? ACCENT : undefined}>{inputFocused ? "▍ " : "  "}</Text>
         {draft.length === 0 && !inputFocused ? (
           <Text dimColor>{field.placeholder}</Text>
@@ -493,12 +491,18 @@ function SourceRow({
           />
         )}
       </Box>
-      <Box marginLeft={2}>
+      <Box marginLeft={2} flexShrink={0}>
         <RestoreButton label={field.restoreLabel} cursor={restoreFocused} />
       </Box>
-      <Box marginLeft={2}>
-        <Text dimColor>{field.description}</Text>
-      </Box>
+      {/*
+        Description line intentionally omitted on source fields. With six
+        rows per source the panel overflows typical terminal heights and
+        Ink starts squashing rows; the squashed row would land on top of
+        the input caret, making it look unfocusable. The description
+        ("Leave empty to use the default", "Where Codex CLI writes…") is
+        non-essential context and the extra line isn't worth the layout
+        instability.
+      */}
     </>
   );
 }

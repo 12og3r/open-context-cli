@@ -24,14 +24,15 @@ describe("SettingsPanel source rows", () => {
     );
     const out = lastFrame() ?? "";
     const lines = out.split("\n");
-    expect(out).toContain("Claude Code sessions");
-    // Badge sits on the same line as the Default path, so a cross-wired
-    // status lookup would surface here.
-    const claudeDefaultLine = lines.find(l =>
+    // The status badge sits on the row directly above the Default path
+    // for each source. A cross-wired lookup would land the wrong badge
+    // on top of the wrong default path; checking the relative position
+    // catches that.
+    const claudeDefaultIdx = lines.findIndex(l =>
       l.includes("Default: /home/u/.claude/projects"),
     );
-    expect(claudeDefaultLine).toBeDefined();
-    expect(claudeDefaultLine!).toContain("Sessions found");
+    expect(claudeDefaultIdx).toBeGreaterThanOrEqual(1);
+    expect(lines[claudeDefaultIdx - 1]!).toContain("Sessions found");
   });
 
   test("Codex row shows red badge when status is missing", () => {
@@ -44,12 +45,11 @@ describe("SettingsPanel source rows", () => {
     );
     const out = lastFrame() ?? "";
     const lines = out.split("\n");
-    expect(out).toContain("Codex sessions");
-    const codexDefaultLine = lines.find(l =>
+    const codexDefaultIdx = lines.findIndex(l =>
       l.includes("Default: /home/u/.codex/sessions"),
     );
-    expect(codexDefaultLine).toBeDefined();
-    expect(codexDefaultLine!).toContain("No valid session found");
+    expect(codexDefaultIdx).toBeGreaterThanOrEqual(1);
+    expect(lines[codexDefaultIdx - 1]!).toContain("No valid session found");
   });
 
   test("source row shows Hidden badge when toggle is off", () => {
@@ -95,5 +95,81 @@ describe("SettingsPanel source rows", () => {
     const out = lastFrame() ?? "";
     expect(out).not.toContain("Show Claude Code sessions");
     expect(out).not.toContain("Show Codex sessions");
+  });
+
+  test("typing into the focused Claude path input updates the rendered value", async () => {
+    // Regression: at typical pane dimensions the input row used to get
+    // squashed by Ink's flex-shrink, leaving the user unable to focus or
+    // type into the path field. flexShrink={0} on the source-row's
+    // critical sub-boxes pins them so they survive layout overflow.
+    const tick = () => new Promise(r => setTimeout(r, 30));
+    const { stdin, lastFrame } = render(
+      <SettingsPanel
+        {...PROPS}
+        width={64}
+        height={28}
+        focused
+        settings={DEFAULT_SETTINGS}
+        sessionStatusBySource={{ "claude-code": "missing", "codex": "missing" }}
+      />,
+    );
+    await tick();
+    stdin.write("abc");
+    await tick();
+    const out = lastFrame() ?? "";
+    expect(out).toContain("abc");
+    // Caret + typed value must both be on a row that survives layout.
+    const inputLine = out.split("\n").find(l => l.includes("abc"));
+    expect(inputLine).toBeDefined();
+    expect(inputLine!).toContain("▍");
+  });
+
+  test("after the Tab cycle returns to input, typing still works", async () => {
+    // Tab cycle is input → restore → toggle → input. Press Tab three times
+    // to land back on input, then type. The keystrokes must reach the
+    // TextInput, not get eaten by the parent useInput as toggle/restore.
+    const tick = () => new Promise(r => setTimeout(r, 30));
+    const { stdin, lastFrame } = render(
+      <SettingsPanel
+        {...PROPS}
+        focused
+        settings={DEFAULT_SETTINGS}
+        sessionStatusBySource={{ "claude-code": "missing", "codex": "missing" }}
+      />,
+    );
+    await tick();
+    stdin.write("\t"); // input → restore
+    await tick();
+    stdin.write("\t"); // restore → toggle
+    await tick();
+    stdin.write("\t"); // toggle → input
+    await tick();
+    stdin.write("xyz");
+    await tick();
+    const out = lastFrame() ?? "";
+    expect(out).toContain("xyz");
+  });
+
+  test("navigating down then back to Claude row, typing works", async () => {
+    // Down-arrow to Codex row, then up-arrow back to Claude. Sub-cursor
+    // should reset to "input" on field change. Typing should work.
+    const tick = () => new Promise(r => setTimeout(r, 30));
+    const { stdin, lastFrame } = render(
+      <SettingsPanel
+        {...PROPS}
+        focused
+        settings={DEFAULT_SETTINGS}
+        sessionStatusBySource={{ "claude-code": "missing", "codex": "missing" }}
+      />,
+    );
+    await tick();
+    stdin.write("\x1b[B"); // down arrow
+    await tick();
+    stdin.write("\x1b[A"); // up arrow
+    await tick();
+    stdin.write("hello");
+    await tick();
+    const out = lastFrame() ?? "";
+    expect(out).toContain("hello");
   });
 });
