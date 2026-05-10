@@ -1,0 +1,3 @@
+{"timestamp":"2026-05-10T09:00:00.000Z","type":"session_meta","payload":{"id":"019e10d0-3333-7000-aaaa-000000000003","timestamp":"2026-05-10T09:00:00.000Z","cwd":"/Users/roger/projects/foo"}}
+this line is not json {{{
+{"timestamp":"2026-05-10T09:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"survives malformed lines"}]}}

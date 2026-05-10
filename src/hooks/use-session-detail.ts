@@ -18,11 +18,11 @@ function yieldToEventLoop(): Promise<void> {
   return new Promise(resolve => setImmediate(resolve));
 }
 
-export function useSessionDetail(provider: SessionProvider, meta: SessionMeta | null): State {
+export function useSessionDetail(provider: SessionProvider | null, meta: SessionMeta | null): State {
   const [state, setState] = useState<State>({ status: "loading", partial: [] });
 
   useEffect(() => {
-    if (!meta) return;
+    if (!meta || !provider) return;
     let cancelled = false;
 
     const cached = detailCache.get(meta.filePath);

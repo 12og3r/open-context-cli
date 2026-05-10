@@ -1,18 +1,32 @@
 import React from "react";
 import { Box, Text } from "ink";
-import type { SessionMeta } from "../providers/types.ts";
+import type { SessionMeta, Source } from "../providers/types.ts";
 import { relativeTime } from "../lib/relative-time.ts";
 import { truncate } from "../lib/truncate.ts";
-import { t } from "../lib/i18n.ts";
+import { t, type Lang } from "../lib/i18n.ts";
 import { useLang } from "../hooks/use-lang.ts";
+
+export function sourceChipLabel(source: Source, lang: Lang): string {
+  return source === "codex"
+    ? t(lang, "source.codex")
+    : t(lang, "source.claude_code");
+}
+
+// Source label rendered in front of the metadata subtitle:
+// "[Claude]" / "[Codex]". The text comes from the i18n table so it
+// stays in sync with the preview chip; the color reinforces the same
+// signal at a glance.
+const SOURCE_COLOR: Record<Source, string> = {
+  "claude-code": "cyan",
+  "codex":       "magenta",
+};
+const SELECTION_BAR = "▌";
 
 const ROWS_PER_ITEM = 2;
 const ROWS_PER_GAP = 1;
 const ROWS_PER_BLOCK = ROWS_PER_ITEM + ROWS_PER_GAP;
 
-const SELECTED_MARKER = "▌ ";
-const UNSELECTED_MARKER = "  ";
-const MARKER_WIDTH = 2;
+const LEAD_WIDTH = 2; // selection bar (or blank) + trailing space
 
 export function SessionList({
   sessions,
@@ -66,18 +80,32 @@ function Item({ meta, selected, innerWidth, now, lang }: {
   selected: boolean;
   innerWidth: number;
   now: Date;
-  lang: import("../lib/i18n.ts").Lang;
+  lang: Lang;
 }) {
-  const marker = selected ? SELECTED_MARKER : UNSELECTED_MARKER;
-  const summary = truncate(meta.summary, innerWidth - MARKER_WIDTH);
-  const meta2 = `  ${relativeTime(meta.modifiedAt, now, lang)}  ·  ${meta.messageCount} ${t(lang, "list.msgs_suffix")}`;
+  const sourceColor = SOURCE_COLOR[meta.source];
+  // Title row: the selection bar (▌) marks selected rows in the source's
+  // color; unselected rows leave that cell blank so titles read clean.
+  // The source-identifying label lives on the subtitle below.
+  const leadGlyph = selected ? SELECTION_BAR : " ";
+  const summary = truncate(meta.summary, innerWidth - LEAD_WIDTH);
+  // Subtitle: "[Claude] 1m ago · 355 msgs". Single space after the
+  // source chip (no separating dot); the remaining metadata pieces are
+  // joined with single-space dots to keep the row tight on narrow panes.
+  // The source prefix is always shown; the rest is truncated if needed.
+  const sourceLabel = `[${sourceChipLabel(meta.source, lang)}]`;
+  const rest = ` ${relativeTime(meta.modifiedAt, now, lang)} · ${meta.messageCount} ${t(lang, "list.msgs_suffix")}`;
+  const restWidth = Math.max(0, innerWidth - sourceLabel.length);
   return (
     <Box flexDirection="column" flexShrink={0}>
       <Text>
-        <Text color={selected ? "cyan" : "gray"}>{marker}</Text>
-        <Text color={selected ? "cyan" : undefined} bold={selected}>{summary}</Text>
+        <Text color={sourceColor} bold={selected}>{leadGlyph}</Text>
+        <Text>{" "}</Text>
+        <Text color={selected ? sourceColor : undefined} bold={selected}>{summary}</Text>
       </Text>
-      <Text dimColor>{truncate(meta2, innerWidth)}</Text>
+      <Text>
+        <Text color={sourceColor} bold>{sourceLabel}</Text>
+        <Text dimColor>{truncate(rest, restWidth)}</Text>
+      </Text>
     </Box>
   );
 }

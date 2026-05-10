@@ -1,0 +1,5 @@
+{"timestamp":"2026-05-10T07:00:00.000Z","type":"session_meta","payload":{"id":"019e10b0-1111-7000-aaaa-000000000001","timestamp":"2026-05-10T07:00:00.000Z","cwd":"/Users/roger/projects/foo"}}
+{"timestamp":"2026-05-10T07:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"please list the files"}]}}
+{"timestamp":"2026-05-10T07:00:02.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"running ls"}]}}
+{"timestamp":"2026-05-10T07:00:03.000Z","type":"response_item","payload":{"type":"function_call","call_id":"call_1","name":"shell","arguments":"{\"command\":[\"ls\",\"-la\"]}"}}
+{"timestamp":"2026-05-10T07:00:04.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_1","output":"total 0\nfile1\nfile2"}}

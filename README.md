@@ -1,12 +1,15 @@
 # openctx
 
-A terminal UI for browsing your local Claude Code session history.
+A terminal UI for browsing your local Claude Code **and Codex CLI** session
+history in one place.
 
 `openctx` reads the JSONL transcripts that Claude Code writes to
-`~/.claude/projects/` and presents them as a two-pane browser: sessions on the
-left, the rendered conversation on the right. Markdown is rendered to ANSI,
-tool calls collapse to one line by default, and a `Ctrl-F` search inside the
-preview lets you jump through hits in the active conversation.
+`~/.claude/projects/` and the rollouts that Codex CLI writes to
+`~/.codex/sessions/`, merging them into a single two-pane browser:
+sessions on the left, the rendered conversation on the right. Each row
+is tagged with the source CLI it came from. Markdown is rendered to
+ANSI, tool calls collapse to one line by default, and a `Ctrl-F` search
+inside the preview lets you jump through hits in the active conversation.
 
 ## Install
 
@@ -72,18 +75,25 @@ app.
 ### Continue conversation
 
 With the cursor on any user or assistant message, hit `⏎` once to reveal a
-*Continue conversation* row at the bottom of the preview, then `⏎` again to
-fork the session. `openctx` writes a fresh JSONL alongside the original
-(new UUID, same project directory) containing the entries up to your cut
-point, then runs `claude --resume <new-uuid>`.
+*Continue conversation* row at the bottom of the preview (with a chip
+showing the source CLI), then `⏎` again to launch.
 
-What happens at the cut point depends on which message you picked:
+For **Claude Code** sessions, `openctx` writes a fresh JSONL alongside
+the original (new UUID, same project directory) containing the entries
+up to your cut point, then runs `claude --resume <new-uuid>`. What
+happens at the cut point depends on which message you picked:
 
 - **User message** — the new history stops *before* this entry; the message
   text is pre-filled into claude's input box (via PTY + bracketed paste) so
   you can edit it before sending.
 - **Assistant message** — the new history *includes* this entry; the input
   box is empty, ready for whatever you want to say next.
+
+For **Codex** sessions, `openctx` calls `codex resume <session-id>`.
+Codex's CLI doesn't expose a per-message cut point, so the resume picks
+up the existing transcript whole; if the cursor is on a user message,
+that text is still pre-filled via bracketed paste so you can edit
+before sending.
 
 The Settings panel exposes a *Continue-conversation launch mode* option:
 
@@ -102,8 +112,19 @@ with a `.jsonl` file per session. The directory name is a slugified version of
 the absolute project path (slashes replaced with dashes). `openctx`
 decodes that back into a real path so the list shows where the session ran.
 
+Codex CLI writes one rollout JSONL per session under
+`~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl`. The
+`session_meta` line at the top of each file carries the cwd, which
+`openctx` reads to display the project path.
+
+Both source directories are configurable in the Settings panel
+(Claude Code sessions directory, Codex sessions directory), and each
+source can be hidden independently. The defaults honor the
+`CLAUDE_CONFIG_DIR` and `CODEX_HOME` environment variables when set.
+
 You can also point `--path` at any directory of `.jsonl` files, or at a single
-file, to inspect transcripts that live elsewhere.
+file, to inspect transcripts that live elsewhere — `--path` puts `openctx`
+into single-source mode (Codex is hidden while it's set).
 
 ## Architecture
 

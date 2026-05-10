@@ -1,0 +1,6 @@
+{"timestamp":"2026-05-10T06:53:32.646Z","type":"session_meta","payload":{"id":"019e10a9-883c-7652-ba9b-3b36dc9face3","timestamp":"2026-05-10T06:53:26.460Z","cwd":"/Users/roger/projects/foo","originator":"codex-tui","cli_version":"0.130.0"}}
+{"timestamp":"2026-05-10T06:53:32.647Z","type":"event_msg","payload":{"type":"task_started","turn_id":"t1"}}
+{"timestamp":"2026-05-10T06:53:32.647Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"<permissions instructions>\nblah\n</permissions instructions>"}]}}
+{"timestamp":"2026-05-10T06:53:32.648Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context><cwd>/x</cwd></environment_context>"}]}}
+{"timestamp":"2026-05-10T06:53:32.648Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hello there codex"}]}}
+{"timestamp":"2026-05-10T06:53:34.329Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hi there. What's the task?"}]}}

@@ -11,6 +11,7 @@ const session: SessionMeta = {
   projectPath: "/tmp/proj",
   modifiedAt: new Date(0),
   messageCount: 12,
+  source: "claude-code",
 };
 
 describe("DeleteConfirm", () => {

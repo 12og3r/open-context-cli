@@ -9,17 +9,19 @@ const SESSIONS: SessionMeta[] = [
   {
     id: "a", filePath: "/a.jsonl", summary: "Building Ink TUI app", projectPath: "/p",
     modifiedAt: new Date("2026-05-07T10:00:00Z"), messageCount: 24,
+    source: "claude-code",
   },
   {
     id: "b", filePath: "/b.jsonl", summary: "Refactor parser", projectPath: "/p",
     modifiedAt: new Date("2026-05-06T22:00:00Z"), messageCount: 18,
+    source: "codex",
   },
 ];
 
 describe("SessionList", () => {
   test("renders summary, relative time, and message count", () => {
     const { lastFrame } = render(
-      <SessionList sessions={SESSIONS} selectedId="a" width={36} now={NOW} />
+      <SessionList sessions={SESSIONS} selectedId="a" width={60} now={NOW} />
     );
     const out = lastFrame() ?? "";
     expect(out).toContain("Building Ink TUI app");
@@ -27,6 +29,28 @@ describe("SessionList", () => {
     expect(out).toContain("24 msgs");
     expect(out).toContain("Refactor parser");
     expect(out).toContain("18 msgs");
+  });
+
+  test("subtitle leads with the bracketed source label", () => {
+    const { lastFrame } = render(
+      <SessionList sessions={SESSIONS} selectedId="a" width={60} now={NOW} />
+    );
+    const out = lastFrame() ?? "";
+    // Full names with brackets, matching the preview-pane chip. A single
+    // space (no dot) follows the source chip; the rest of the metadata
+    // pieces are still joined by single-space dots.
+    expect(out).toMatch(/\[Claude\]\s+2h ago\s+·\s+24 msgs/);
+    expect(out).toMatch(/\[Codex\]\s+Yesterday\s+·\s+18 msgs/);
+  });
+
+  test("selected rows lead with the ▌ bar in the source color; unselected rows leave that cell blank", () => {
+    const { lastFrame } = render(
+      <SessionList sessions={SESSIONS} selectedId="b" width={60} now={NOW} />
+    );
+    const out = lastFrame() ?? "";
+    // The selected codex row carries the ▌ bar before its title; the
+    // source identification still happens on the subtitle (CDX).
+    expect(out).toMatch(/▌\s+Refactor parser/);
   });
 
   test("separates adjacent items with a blank gap row", () => {

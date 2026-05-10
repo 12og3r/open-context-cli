@@ -1,6 +1,13 @@
 import type { ContinueLaunchMode } from "./settings.ts";
+import type { Source } from "../providers/types.ts";
 
 export interface ContinueRequest {
+  // Which CLI produced this transcript — drives launcher dispatch (claude
+  // vs codex) and which pre-flight checks apply.
+  source: Source;
+  // Session id (for codex this is the resume target; for claude it's the
+  // original session and a new uuid is minted by the launcher for the fork).
+  sessionId: string;
   // Path to the source JSONL — used to locate project dir + read entries.
   sourcePath: string;
   // Cursor message uuid.
@@ -18,6 +25,7 @@ export interface ContinueRequest {
   // Force mode: when set, the original project directory was missing and
   // the user asked to launch in this cwd instead. The launcher uses this
   // path as both the spawn cwd and as the value rewritten into every
-  // copied JSONL entry's `cwd` field.
+  // copied JSONL entry's `cwd` field. Only applies to claude-source
+  // sessions; the codex launcher does not fork or rewrite cwd.
   forceCwd?: string;
 }

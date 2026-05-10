@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
-import type { Message } from "../providers/types.ts";
+import type { Message, Source } from "../providers/types.ts";
 import {
   applyCursorOverlay,
   CancelledError,
@@ -13,12 +13,14 @@ import type { Match } from "../lib/matches.ts";
 import { t } from "../lib/i18n.ts";
 import { useLang } from "../hooks/use-lang.ts";
 import { trace } from "../lib/debug-trace.ts";
+import { sourceChipLabel } from "./session-list.tsx";
 
 const EMPTY_BUFFER: ConversationBuffer = { lines: [], startLine: [], endLine: [], matches: [] };
 
 export function SessionPreview({
   messages,
   sessionId,
+  source = null,
   focused,
   height,
   width,
@@ -29,6 +31,7 @@ export function SessionPreview({
 }: {
   messages: Message[];
   sessionId: string | null;
+  source?: Source | null;
   focused: boolean;
   height: number;
   width: number;
@@ -527,8 +530,13 @@ export function SessionPreview({
       {continueOpen && (
         <Box flexDirection="column" flexShrink={0}>
           <Text dimColor>{"─".repeat(width)}</Text>
-          <Text wrap="truncate" color="cyan" bold>
-            {t(lang, forceMode ? "continue.footer_label_force" : "continue.footer_label")}
+          <Text wrap="truncate">
+            <Text color="cyan" bold>
+              {t(lang, forceMode ? "continue.footer_label_force" : "continue.footer_label")}
+            </Text>
+            {source && (
+              <Text dimColor>{`  [${sourceChipLabel(source, lang)}]`}</Text>
+            )}
           </Text>
           {continueError && (
             <Text wrap="truncate" color={forceMode ? "yellow" : "red"}>

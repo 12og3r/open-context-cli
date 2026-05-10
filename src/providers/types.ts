@@ -1,5 +1,7 @@
 // src/providers/types.ts
 
+export type Source = "claude-code" | "codex";
+
 export type Role = "user" | "assistant" | "tool_use" | "tool_result" | "system";
 
 export interface Message {
@@ -22,6 +24,7 @@ export interface SessionMeta {
   cwd?: string;          // exact cwd from the first user/assistant entry's
                          // `cwd` field — preferred over decoding the slug,
                          // which is lossy when path segments contain "-".
+  source: Source;        // which CLI produced this transcript
 }
 
 export interface SessionProvider {

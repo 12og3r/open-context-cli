@@ -20,7 +20,7 @@ function parseArgs(argv: string[]): { path?: string; emoji: boolean } {
 }
 
 function printHelp() {
-  process.stdout.write(`openctx ${pkg.version} — browse local Claude Code session history
+  process.stdout.write(`openctx ${pkg.version} — browse local Claude Code and Codex session history
 
 Usage:
   openctx [--path <dir-or-file>] [--no-emoji]
@@ -28,7 +28,10 @@ Usage:
   openctx --help
 
 Options:
-  --path <p>         Use <p> as the session root instead of ~/.claude/projects.
+  --path <p>         Use <p> as the Claude Code session root instead of
+                     ~/.claude/projects. Codex is hidden while --path is set;
+                     for normal multi-source browsing, omit --path and use
+                     the Settings panel to configure each source's directory.
   --no-emoji         Render plain role labels instead of emoji.
   -v, --version      Print the openctx version and exit.
   -h, --help         Print this help and exit.

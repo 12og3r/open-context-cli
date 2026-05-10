@@ -177,6 +177,7 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
     modifiedAt: stat.mtime,
     messageCount,
     cwd: recordedCwd || undefined,
+    source: "claude-code",
   };
 }
 

@@ -168,14 +168,7 @@ export function SessionBrowser({
         setFocus("list");
         return;
       }
-      if (key.return) {
-        // Enter == "confirm settings" — close the panel and drop the user
-        // straight onto the previously-selected session's preview.
-        setRightView("preview");
-        setFocus("preview");
-        return;
-      }
-      // arrow / space handling lives inside SettingsPanel
+      // arrow / space / enter handling lives inside SettingsPanel
     }
 
     if (focus === "delete-confirm") {

@@ -4,9 +4,16 @@ import { trace } from "./debug-trace.ts";
 const PASTE_START = "\x1b[200~";
 const PASTE_END   = "\x1b[201~";
 
+export interface LaunchCommand {
+  // Executable name resolved via PATH ("claude", "codex"). Not an absolute
+  // path because the PTY backends look it up via the shell.
+  exe: string;
+  args: string[];
+}
+
 export interface PtyRunSpec {
   cwd: string;
-  resumeId: string;
+  command: LaunchCommand;
   prefillText?: string;
 }
 
@@ -59,10 +66,10 @@ function stringifyEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   return out;
 }
 
-// Spawn `claude --resume <id>` via node-pty, attach stdio, optionally inject
-// `prefillText` as a bracketed paste (~80ms after the first stdout chunk so
-// the Ink UI inside claude has had a chance to draw its prompt). Resolves
-// with the child's exit code.
+// Spawn the target CLI via node-pty, attach stdio, optionally inject
+// `prefillText` as a bracketed paste once the child's TUI has mounted.
+// Resolves with the child's exit code. The command (claude vs codex,
+// args) is provided by the caller — this function is shape-agnostic.
 export async function runPty(spec: PtyRunSpec): Promise<number> {
   const ptyMod = await loadPtyModule();
   debug("pty module loaded");
@@ -71,8 +78,8 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
   const term = process.env.TERM ?? "xterm-256color";
   const env = stringifyEnv({ ...process.env, TERM: term });
 
-  debug(`spawn claude --resume ${spec.resumeId.slice(0, 8)} cwd=${spec.cwd}`);
-  const child = ptyMod.spawn("claude", ["--resume", spec.resumeId], {
+  debug(`spawn ${spec.command.exe} ${spec.command.args.join(" ")} cwd=${spec.cwd}`);
+  const child = ptyMod.spawn(spec.command.exe, spec.command.args, {
     name: term,
     cols, rows,
     cwd: spec.cwd,

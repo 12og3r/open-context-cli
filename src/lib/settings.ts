@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { DEFAULT_LANG, LANGS, type Lang } from "./i18n.ts";
+import type { Source } from "../providers/types.ts";
 
 export type DisplayMode = "concise" | "full";
 export type ContinueLaunchMode = "reuse-current" | "new-window";
@@ -16,6 +17,14 @@ export interface Settings {
   // app-level scanner is the layer that decides what to do with a missing
   // or empty directory.
   sessionsDir: string;
+  // Codex CLI sessions root. Same empty-string-means-default semantics as
+  // sessionsDir; the default resolves to `${CODEX_HOME ?? ~/.codex}/sessions`.
+  codexSessionsDir: string;
+  // Per-source visibility. When a source is disabled, its sessions are
+  // skipped during aggregation. Both default true — disabling a source is
+  // a deliberate user choice.
+  showClaudeCode: boolean;
+  showCodex: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -24,7 +33,21 @@ export const DEFAULT_SETTINGS: Settings = {
   language: DEFAULT_LANG,
   continueLaunchMode: "reuse-current",
   sessionsDir: "",
+  codexSessionsDir: "",
+  showClaudeCode: true,
+  showCodex: true,
 };
+
+/**
+ * Map the boolean visibility settings to the {source: enabled} record
+ * used by the providers/listAllSessions helper.
+ */
+export function enabledSourcesFromSettings(s: Settings): Record<Source, boolean> {
+  return {
+    "claude-code": s.showClaudeCode,
+    "codex":       s.showCodex,
+  };
+}
 
 export function settingsDir(): string {
   return path.join(os.homedir(), "openctx");
@@ -74,6 +97,15 @@ function sanitize(p: Partial<Settings>): Partial<Settings> {
   }
   if (typeof p.sessionsDir === "string") {
     out.sessionsDir = p.sessionsDir;
+  }
+  if (typeof p.codexSessionsDir === "string") {
+    out.codexSessionsDir = p.codexSessionsDir;
+  }
+  if (typeof p.showClaudeCode === "boolean") {
+    out.showClaudeCode = p.showClaudeCode;
+  }
+  if (typeof p.showCodex === "boolean") {
+    out.showCodex = p.showCodex;
   }
   return out;
 }
