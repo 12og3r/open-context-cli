@@ -23,9 +23,15 @@ describe("SettingsPanel source rows", () => {
       />,
     );
     const out = lastFrame() ?? "";
+    const lines = out.split("\n");
     expect(out).toContain("Claude Code sessions");
-    expect(out).toContain("Sessions found");
-    expect(out).toContain("Default: /home/u/.claude/projects");
+    // Badge sits on the same line as the Default path, so a cross-wired
+    // status lookup would surface here.
+    const claudeDefaultLine = lines.find(l =>
+      l.includes("Default: /home/u/.claude/projects"),
+    );
+    expect(claudeDefaultLine).toBeDefined();
+    expect(claudeDefaultLine!).toContain("Sessions found");
   });
 
   test("Codex row shows red badge when status is missing", () => {
@@ -37,8 +43,13 @@ describe("SettingsPanel source rows", () => {
       />,
     );
     const out = lastFrame() ?? "";
+    const lines = out.split("\n");
     expect(out).toContain("Codex sessions");
-    expect(out).toContain("No valid session found");
+    const codexDefaultLine = lines.find(l =>
+      l.includes("Default: /home/u/.codex/sessions"),
+    );
+    expect(codexDefaultLine).toBeDefined();
+    expect(codexDefaultLine!).toContain("No valid session found");
   });
 
   test("source row shows Hidden badge when toggle is off", () => {

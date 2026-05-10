@@ -40,7 +40,6 @@ type SourceFieldDef = {
   toggleKey: ShowSourceKey;
   title: string;
   description: string;
-  defaultPath: string;
   defaultLabel: string;
   restoreLabel: string;
   placeholder: string;
@@ -61,7 +60,6 @@ function buildFields(
       toggleKey: "showClaudeCode",
       title: t(lang, "settings.sessions_dir.title"),
       description: t(lang, "settings.sessions_dir.description"),
-      defaultPath: defaultClaudeDir,
       defaultLabel: t(lang, "settings.sessions_dir.default_label", {
         path: defaultClaudeDir || "—",
       }),
@@ -75,7 +73,6 @@ function buildFields(
       toggleKey: "showCodex",
       title: t(lang, "settings.codex_sessions_dir.title"),
       description: t(lang, "settings.codex_sessions_dir.description"),
-      defaultPath: defaultCodexDir,
       defaultLabel: t(lang, "settings.sessions_dir.default_label", {
         path: defaultCodexDir || "—",
       }),
