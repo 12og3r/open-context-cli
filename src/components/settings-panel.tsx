@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
 import type { Settings, DisplayMode } from "../lib/settings.ts";
 import type {
   SessionStatusBySource,
@@ -472,21 +471,12 @@ function SourceRow({
           />
         </Box>
       </Box>
-      {/*
-        The default-path label is shown INSIDE the input as the
-        placeholder when no draft has been typed. We disable
-        ink-text-input's built-in inverse-block cursor and render a thin
-        `│` of our own to the left so the cursor never overlays the
-        first character of the placeholder or the typed value.
-      */}
-      <Box marginLeft={2} flexDirection="row" flexShrink={0}>
-        <Text color={inputFocused ? ACCENT : undefined}>{inputFocused ? "│ " : "  "}</Text>
-        <TextInput
+      <Box marginLeft={2} flexShrink={0}>
+        <PathInput
           value={draft}
           onChange={onDraftChange}
           focus={inputFocused}
           placeholder={field.defaultLabel}
-          showCursor={false}
         />
       </Box>
       <Box marginLeft={2} flexShrink={0}>
@@ -502,6 +492,99 @@ function SourceRow({
         instability.
       */}
     </>
+  );
+}
+
+/**
+ * Single-line text input with a thin `│` cursor that follows typing.
+ *
+ * We can't use ink-text-input here: its cursor is a `chalk.inverse`
+ * block on the character at cursorOffset, which means typing "/" gets
+ * rendered as an inverted "/", and the user can't see the character
+ * the cursor is on. The user explicitly asked for a thin vertical-line
+ * cursor that sits between characters instead. The implementation
+ * mirrors ink-text-input's keystroke handling (typing, backspace,
+ * left/right) so behavior matches what users expect from a text box.
+ */
+function PathInput({
+  value,
+  onChange,
+  focus,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  focus: boolean;
+  placeholder?: string;
+}) {
+  const [cursorOffset, setCursorOffset] = useState(value.length);
+
+  // Snap cursor to end whenever focus turns on, so re-entering the
+  // field doesn't leave a stale offset from the last edit.
+  useEffect(() => {
+    if (focus) setCursorOffset(value.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus]);
+
+  // Clamp cursor when value shrinks externally (e.g. Restore default).
+  useEffect(() => {
+    if (cursorOffset > value.length) setCursorOffset(value.length);
+  }, [value, cursorOffset]);
+
+  useInput((input, key) => {
+    if (key.upArrow || key.downArrow) return;
+    if (key.tab || (key.shift && key.tab)) return;
+    if (key.return || key.escape) return;
+    if (key.ctrl || key.meta) return;
+
+    if (key.leftArrow) {
+      setCursorOffset(o => Math.max(0, o - 1));
+      return;
+    }
+    if (key.rightArrow) {
+      setCursorOffset(o => Math.min(value.length, o + 1));
+      return;
+    }
+    if (key.backspace || key.delete) {
+      if (cursorOffset === 0) return;
+      const next = value.slice(0, cursorOffset - 1) + value.slice(cursorOffset);
+      setCursorOffset(o => o - 1);
+      onChange(next);
+      return;
+    }
+    if (input) {
+      const next = value.slice(0, cursorOffset) + input + value.slice(cursorOffset);
+      setCursorOffset(o => o + input.length);
+      onChange(next);
+    }
+  }, { isActive: focus });
+
+  // Empty value: show placeholder (and the cursor at start when focused).
+  if (value.length === 0) {
+    if (focus) {
+      return (
+        <Text>
+          <Text color={ACCENT}>│</Text>
+          {placeholder ? <Text dimColor>{placeholder}</Text> : null}
+        </Text>
+      );
+    }
+    return placeholder ? <Text dimColor>{placeholder}</Text> : <Text> </Text>;
+  }
+
+  // Has value: render value, with the thin cursor inserted at cursorOffset
+  // when focused.
+  if (!focus) {
+    return <Text>{value}</Text>;
+  }
+  const before = value.slice(0, cursorOffset);
+  const after = value.slice(cursorOffset);
+  return (
+    <Text>
+      {before}
+      <Text color={ACCENT}>│</Text>
+      {after}
+    </Text>
   );
 }
 
