@@ -41,9 +41,14 @@ bun run dev
 openctx                      # scan ~/.claude/projects
 openctx --path ./logs        # use a custom directory or a single .jsonl
 openctx --no-emoji           # plain role labels instead of emoji
+openctx update               # reinstall to the latest version
+openctx update 0.2.0         # pin a specific version
 openctx -v                   # print version and exit
 openctx --help
 ```
+
+`openctx update` reinstalls via whichever package manager owns the binary
+on disk (npm / bun / pnpm / yarn — detected from the install path).
 
 If no sessions are found at the default location, `openctx` opens directly
 on the Settings panel with a red status indicator next to the *Sessions

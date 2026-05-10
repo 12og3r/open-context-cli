@@ -24,8 +24,14 @@ function printHelp() {
 
 Usage:
   openctx [--path <dir-or-file>] [--no-emoji]
+  openctx update [<version>]
   openctx --version
   openctx --help
+
+Commands:
+  update [<version>]   Reinstall openctx via the package manager that
+                       installed it (npm / bun / pnpm / yarn). Pass a
+                       version (e.g. \`0.2.0\`) to pin; omit to take latest.
 
 Options:
   --path <p>         Use <p> as the Claude Code session root instead of
@@ -36,6 +42,15 @@ Options:
   -v, --version      Print the openctx version and exit.
   -h, --help         Print this help and exit.
 `);
+}
+
+// `openctx update [<version>]` is intercepted before flag parsing so it
+// doesn't have to share argument shape with the browser. It dispatches to
+// the package manager that installed openctx and exits with the child's
+// exit code — Ink is never mounted on this path.
+if (process.argv[2] === "update") {
+  const { runUpdate } = await import("./lib/update.ts");
+  process.exit(await runUpdate({ version: process.argv[3] }));
 }
 
 const { path: initialPath, emoji } = parseArgs(process.argv);
