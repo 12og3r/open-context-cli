@@ -1,10 +1,25 @@
 import wrapAnsi from "wrap-ansi";
+import emojiRegex from "emoji-regex";
+import stringWidth from "string-width";
 import type { Message, Role } from "../providers/types.ts";
 import { markdownToAnsi } from "./markdown-ansi.ts";
 import { findMatches, type Match } from "./matches.ts";
 import { DEFAULT_LANG, t, type Lang } from "./i18n.ts";
 import { localTimeOfDay, relativeTime } from "./relative-time.ts";
 import { truncate } from "./truncate.ts";
+
+// Apple Color Emoji renders some glyphs taller than the monospace cell — most
+// visibly ✅ in Warp / Ghostty — so the row containing the emoji vertically
+// pushes / steals from neighboring rows. We can't change the terminal's row
+// height from here, and a blank-spacer compensation does not help in every
+// terminal, so the only reliable fix is to never let the terminal reach for
+// the emoji font in the first place: replace each emoji match with width-
+// preserving whitespace before the content goes through markdown / wrapping.
+const EMOJI_RE_GLOBAL = emojiRegex();
+function stripEmojiKeepWidth(s: string): string {
+  EMOJI_RE_GLOBAL.lastIndex = 0;
+  return s.replace(EMOJI_RE_GLOBAL, m => " ".repeat(Math.max(1, stringWidth(m))));
+}
 
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
@@ -80,12 +95,19 @@ export function renderMessageLines(message: Message, opts: RenderMessageOpts): s
   );
 
   const indent = "    ";
-  const bodyWidth = Math.max(8, width - indent.length);
+  // Reserve 1 cell of slack so the cursor-body overlay fits even when its
+  // stripe character `▏` (U+258F, East-Asian-Width = Ambiguous) is rendered
+  // as 2 cells. CJK-configured terminals commonly draw Ambiguous-width chars
+  // 2 cells wide, in which case the overlay prefix "  ▏ " visually occupies
+  // 5 cells instead of 4. Without this slack, body lines wrapped to fit
+  // innerWidth exactly would overflow by 1 cell when the cursor lands on the
+  // message — the terminal auto-wraps them, breaking the pane layout.
+  const bodyWidth = Math.max(8, width - indent.length - 1);
   let bodyText: string;
   let bodyStyle = "";
 
   if (message.role === "tool_use" || message.role === "tool_result") {
-    const content = message.content || "";
+    const content = stripEmojiKeepWidth(message.content || "");
     const lines = content.split("\n");
     const lineCount = lines.length;
     bodyStyle = DIM;
@@ -102,10 +124,10 @@ export function renderMessageLines(message: Message, opts: RenderMessageOpts): s
       bodyText = `▾ ${content}`;
     }
   } else if (message.role === "system") {
-    bodyText = message.content || "";
+    bodyText = stripEmojiKeepWidth(message.content || "");
     bodyStyle = `${DIM}${ITALIC}`;
   } else {
-    bodyText = markdownToAnsi(message.content || "");
+    bodyText = markdownToAnsi(stripEmojiKeepWidth(message.content || ""));
   }
 
   // Body line prefix: matches the header's bar column. For the current

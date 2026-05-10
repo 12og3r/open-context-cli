@@ -6,7 +6,7 @@
       "name": "claude-history-cli",
       "dependencies": {
         "@lydell/node-pty": "^1.2.0-beta.12",
-        "bun-pty": "^0.4.8",
+        "emoji-regex": "^10.0.0",
         "ink": "^5.0.1",
         "ink-spinner": "^5.0.0",
         "ink-text-input": "^6.0.0",
@@ -20,6 +20,9 @@
         "@types/react": "^18.3.0",
         "ink-testing-library": "^4.0.0",
         "typescript": "^5.5.0",
+      },
+      "optionalDependencies": {
+        "bun-pty": "^0.4.8",
       },
     },
   },
