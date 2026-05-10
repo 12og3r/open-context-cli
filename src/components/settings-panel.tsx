@@ -462,6 +462,8 @@ function SourceRow({
         <Box>
           <Text color={fieldFocused ? ACCENT : undefined} bold={fieldFocused}>
             {fieldFocused ? "› " : "  "}{field.title}
+            <Text>{"  "}</Text>
+            <StatusBadge status={status} lang={lang} />
           </Text>
         </Box>
         <Box>
@@ -472,9 +474,6 @@ function SourceRow({
             lang={lang}
           />
         </Box>
-      </Box>
-      <Box marginLeft={2} flexShrink={0}>
-        <StatusBadge status={status} lang={lang} />
       </Box>
       <Box marginLeft={2} flexShrink={0}>
         <Text dimColor>{field.defaultLabel}</Text>

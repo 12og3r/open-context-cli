@@ -74,11 +74,11 @@ describe("SettingsPanel source rows", () => {
     );
     const out = lastFrame() ?? "";
     const lines = out.split("\n");
-    const claudeTitleLine = lines.find(l => l.includes("Claude Code sessions"));
+    const claudeTitleLine = lines.find(l => l.includes("Claude Code path"));
     expect(claudeTitleLine).toBeDefined();
     expect(claudeTitleLine!).toContain("On");
     expect(claudeTitleLine!).toContain("Off");
-    const codexTitleLine = lines.find(l => l.includes("Codex sessions"));
+    const codexTitleLine = lines.find(l => l.includes("Codex path"));
     expect(codexTitleLine).toBeDefined();
     expect(codexTitleLine!).toContain("On");
     expect(codexTitleLine!).toContain("Off");
