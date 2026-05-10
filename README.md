@@ -38,6 +38,7 @@ bun run dev
 openctx                      # scan ~/.claude/projects
 openctx --path ./logs        # use a custom directory or a single .jsonl
 openctx --no-emoji           # plain role labels instead of emoji
+openctx -v                   # print version and exit
 openctx --help
 ```
 

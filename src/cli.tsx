@@ -4,6 +4,7 @@ import { render } from "ink";
 import { App } from "./app.tsx";
 import type { ContinueRequest } from "./lib/continue-types.ts";
 import { trace } from "./lib/debug-trace.ts";
+import pkg from "../package.json" with { type: "json" };
 
 function parseArgs(argv: string[]): { path?: string; emoji: boolean } {
   let path: string | undefined;
@@ -13,20 +14,24 @@ function parseArgs(argv: string[]): { path?: string; emoji: boolean } {
     if (a === "--path") { path = argv[i + 1]; i++; }
     else if (a === "--no-emoji") { emoji = false; }
     else if (a === "--help" || a === "-h") { printHelp(); process.exit(0); }
+    else if (a === "--version" || a === "-v") { process.stdout.write(`${pkg.version}\n`); process.exit(0); }
   }
   return { path, emoji };
 }
 
 function printHelp() {
-  process.stdout.write(`open-context — browse local Claude Code session history
+  process.stdout.write(`openctx ${pkg.version} — browse local Claude Code session history
 
 Usage:
-  open-context [--path <dir-or-file>] [--no-emoji]
-  open-context --help
+  openctx [--path <dir-or-file>] [--no-emoji]
+  openctx --version
+  openctx --help
 
 Options:
-  --path <p>    Use <p> as the session root instead of ~/.claude/projects.
-  --no-emoji    Render plain role labels instead of emoji.
+  --path <p>         Use <p> as the session root instead of ~/.claude/projects.
+  --no-emoji         Render plain role labels instead of emoji.
+  -v, --version      Print the openctx version and exit.
+  -h, --help         Print this help and exit.
 `);
 }
 
