@@ -1,9 +1,20 @@
+import fs from "node:fs";
 import process from "node:process";
 import type { ContinueRequest } from "./continue-types.ts";
 import type { ContinueResult } from "./continue-launch.ts";
 import { runPty } from "./continue-pty.ts";
 import { spawnNewWindow } from "./continue-spawn.ts";
 import { trace } from "./debug-trace.ts";
+
+// Resolve the cwd to spawn `codex resume` in. The PTY's spawn-helper does
+// the chdir itself and exits with code 1 (no stderr surfaced) if the path
+// is missing — which propagates as a silent process.exit(1) on our side.
+// Fall back to process.cwd() when the recorded directory was deleted or
+// renamed since the session was captured.
+export function resolveCodexLaunchCwd(sourceCwd: string | undefined): string {
+  if (sourceCwd && fs.existsSync(sourceCwd)) return sourceCwd;
+  return process.cwd();
+}
 
 /**
  * Continue a Codex session. Codex's `resume` and `fork` subcommands are
@@ -28,10 +39,9 @@ export async function executeContinueCodex(req: ContinueRequest): Promise<Contin
   }
 
   // No fork happens for codex — just resume the existing session in the
-  // recorded cwd if it still exists, or process.cwd() otherwise. codex
-  // itself handles a missing cwd gracefully.
-  const cwd = req.sourceCwd ?? process.cwd();
-  trace("launch-codex", `cwd=${cwd}`);
+  // recorded cwd if it still exists, or process.cwd() otherwise.
+  const cwd = resolveCodexLaunchCwd(req.sourceCwd);
+  trace("launch-codex", `cwd=${cwd} (sourceCwd=${req.sourceCwd ?? "(none)"})`);
 
   const command = { exe: "codex", args: ["resume", req.sessionId] };
 
