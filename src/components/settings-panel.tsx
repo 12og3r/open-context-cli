@@ -2,7 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import type { Settings, DisplayMode } from "../lib/settings.ts";
-import type { SessionStatusBySource } from "../lib/session-status.ts";
+import type {
+  SessionStatusBySource,
+  SourceStatus,
+} from "../lib/session-status.ts";
+import type { Source } from "../providers/types.ts";
 import { t, type Lang } from "../lib/i18n.ts";
 import { useLang } from "../hooks/use-lang.ts";
 
@@ -13,36 +17,36 @@ const OK = "green";
 // Setting keys that are edited via the path-input UX (text box + restore
 // default button). Anything else is rendered as an options field.
 type PathSettingsKey = "sessionsDir" | "codexSessionsDir";
+type ShowSourceKey = "showClaudeCode" | "showCodex";
 const PATH_SETTING_KEYS: readonly PathSettingsKey[] = [
   "sessionsDir",
   "codexSessionsDir",
 ] as const;
 
+type OptionsKeys = Exclude<keyof Settings, PathSettingsKey | ShowSourceKey>;
 type OptionsFieldDef = {
-  [K in Exclude<keyof Settings, PathSettingsKey>]: {
+  [K in OptionsKeys]: {
     kind: "options";
     key: K;
     title: string;
     options: Array<{ value: Settings[K]; label: string; description: string }>;
   };
-}[Exclude<keyof Settings, PathSettingsKey>];
+}[OptionsKeys];
 
-type PathFieldDef = {
-  kind: "path";
-  key: PathSettingsKey;
+type SourceFieldDef = {
+  kind: "source";
+  source: Source;
+  pathKey: PathSettingsKey;
+  toggleKey: ShowSourceKey;
   title: string;
   description: string;
   defaultPath: string;
   defaultLabel: string;
   restoreLabel: string;
   placeholder: string;
-  // Only the first path field is the one whose status badge ("Sessions
-  // found" / "missing") is meaningful — that's the Claude one. Codex shows
-  // no status badge to keep the panel uncluttered.
-  showStatus: boolean;
 };
 
-type FieldDef = OptionsFieldDef | PathFieldDef;
+type FieldDef = OptionsFieldDef | SourceFieldDef;
 
 function buildFields(
   lang: Lang,
@@ -51,8 +55,10 @@ function buildFields(
 ): FieldDef[] {
   return [
     {
-      kind: "path",
-      key: "sessionsDir",
+      kind: "source",
+      source: "claude-code",
+      pathKey: "sessionsDir",
+      toggleKey: "showClaudeCode",
       title: t(lang, "settings.sessions_dir.title"),
       description: t(lang, "settings.sessions_dir.description"),
       defaultPath: defaultClaudeDir,
@@ -61,11 +67,12 @@ function buildFields(
       }),
       restoreLabel: t(lang, "settings.sessions_dir.restore"),
       placeholder: t(lang, "settings.sessions_dir.placeholder"),
-      showStatus: true,
     },
     {
-      kind: "path",
-      key: "codexSessionsDir",
+      kind: "source",
+      source: "codex",
+      pathKey: "codexSessionsDir",
+      toggleKey: "showCodex",
       title: t(lang, "settings.codex_sessions_dir.title"),
       description: t(lang, "settings.codex_sessions_dir.description"),
       defaultPath: defaultCodexDir,
@@ -74,41 +81,6 @@ function buildFields(
       }),
       restoreLabel: t(lang, "settings.sessions_dir.restore"),
       placeholder: t(lang, "settings.sessions_dir.placeholder"),
-      showStatus: false,
-    },
-    {
-      kind: "options",
-      key: "showClaudeCode",
-      title: t(lang, "settings.show_source.claude_title"),
-      options: [
-        {
-          value: true,
-          label: t(lang, "settings.show_source.on"),
-          description: t(lang, "settings.show_source.on_desc"),
-        },
-        {
-          value: false,
-          label: t(lang, "settings.show_source.off"),
-          description: t(lang, "settings.show_source.off_desc"),
-        },
-      ],
-    },
-    {
-      kind: "options",
-      key: "showCodex",
-      title: t(lang, "settings.show_source.codex_title"),
-      options: [
-        {
-          value: true,
-          label: t(lang, "settings.show_source.on"),
-          description: t(lang, "settings.show_source.on_desc"),
-        },
-        {
-          value: false,
-          label: t(lang, "settings.show_source.off"),
-          description: t(lang, "settings.show_source.off_desc"),
-        },
-      ],
     },
     {
       kind: "options",
@@ -184,7 +156,7 @@ function buildFields(
   ];
 }
 
-type PathSubCursor = "input" | "restore";
+type SourceSubCursor = "input" | "restore" | "toggle";
 
 type PathDrafts = Record<PathSettingsKey, string>;
 
@@ -220,10 +192,10 @@ export function SettingsPanel({
     initialCursor(FIELDS, settings),
   );
 
-  // Sub-cursor for path-kind fields: which sub-element currently owns input.
-  // Reset to "input" whenever any path field is (re)entered, so typing works
+  // Sub-cursor for source-kind fields: which sub-element currently owns input.
+  // Reset to "input" whenever any source field is (re)entered, so typing works
   // immediately without a Tab.
-  const [pathSubCursor, setPathSubCursor] = useState<PathSubCursor>("input");
+  const [sourceSubCursor, setSourceSubCursor] = useState<SourceSubCursor>("input");
 
   // Local drafts of each path setting. Decoupled from settings so we can
   // debounce the rescan in app.tsx — drafts commit to settings only when
@@ -248,7 +220,7 @@ export function SettingsPanel({
         sessionsDir: settings.sessionsDir,
         codexSessionsDir: settings.codexSessionsDir,
       });
-      setPathSubCursor("input");
+      setSourceSubCursor("input");
     }
   }, [focused, settings, FIELDS]);
 
@@ -274,10 +246,10 @@ export function SettingsPanel({
     };
   }, []);
 
-  // Pin the sub-cursor back to "input" when the user moves to a path field
+  // Pin the sub-cursor back to "input" when the user moves to a source field
   // from elsewhere (so the next keystroke types into the input box).
   useEffect(() => {
-    setPathSubCursor("input");
+    setSourceSubCursor("input");
   }, [fieldIdx]);
 
   const field = FIELDS[fieldIdx]!;
@@ -285,16 +257,16 @@ export function SettingsPanel({
   useInput((input, key) => {
     if (!focused) return;
 
-    // While a path input owns input, only handle field navigation + Tab.
+    // While the path input has focus, only handle field navigation + Tab.
     // Everything else (typing, ←/→ within text) is delegated to
     // ink-text-input via its `focus` prop.
-    if (field.kind === "path" && pathSubCursor === "input") {
+    if (field.kind === "source" && sourceSubCursor === "input") {
       if (key.upArrow) {
         setFieldIdx(i => Math.max(0, i - 1));
       } else if (key.downArrow) {
         setFieldIdx(i => Math.min(FIELDS.length - 1, i + 1));
       } else if (key.tab) {
-        setPathSubCursor("restore");
+        setSourceSubCursor("restore");
       }
       return;
     }
@@ -307,8 +279,15 @@ export function SettingsPanel({
       setFieldIdx(i => Math.min(FIELDS.length - 1, i + 1));
       return;
     }
-    if (key.tab) {
-      if (field.kind === "path") setPathSubCursor("input");
+
+    if (field.kind === "source" && key.tab) {
+      // input → restore → toggle → input
+      setSourceSubCursor(c =>
+        c === "restore" ? "toggle" : c === "toggle" ? "input" : "restore",
+      );
+      return;
+    }
+    if (field.kind === "options" && key.tab) {
       return;
     }
 
@@ -323,16 +302,25 @@ export function SettingsPanel({
       return;
     }
 
-    // field.kind === "path", pathSubCursor === "restore"
-    if (input === " " || key.return) {
-      // Restore default: clear both the draft and the applied setting so
-      // the change takes effect immediately, and drop focus back into the
-      // input for the next edit.
-      setPathDrafts(prev => ({ ...prev, [field.key]: "" }));
-      if (settings[field.key] !== "") onChange(field.key, "");
-      setPathSubCursor("input");
-    } else if (key.leftArrow || input === "h" || key.rightArrow || input === "l") {
-      setPathSubCursor("input");
+    // field.kind === "source"
+    if (sourceSubCursor === "restore") {
+      if (input === " " || key.return) {
+        setPathDrafts(prev => ({ ...prev, [field.pathKey]: "" }));
+        if (settings[field.pathKey] !== "") onChange(field.pathKey, "");
+        setSourceSubCursor("input");
+      } else if (key.leftArrow || input === "h" || key.rightArrow || input === "l") {
+        setSourceSubCursor("input");
+      }
+      return;
+    }
+
+    // sourceSubCursor === "toggle"
+    if (key.leftArrow || input === "h") {
+      moveToggleCursor(field, -1);
+    } else if (key.rightArrow || input === "l") {
+      moveToggleCursor(field, +1);
+    } else if (input === " " || key.return) {
+      applyToggleCursor(field);
     }
   });
 
@@ -353,6 +341,20 @@ export function SettingsPanel({
     (onChange as (k: string, v: unknown) => void)(f.key, next.value);
   }
 
+  function moveToggleCursor(f: SourceFieldDef, dir: 1 | -1) {
+    setOptionCursor(prev => {
+      const cur = prev[f.toggleKey] ?? 0;
+      return { ...prev, [f.toggleKey]: (cur + dir + 2) % 2 };
+    });
+  }
+
+  function applyToggleCursor(f: SourceFieldDef) {
+    const idx = optionCursor[f.toggleKey] ?? 0;
+    // Index 0 is "On" (true), index 1 is "Off" (false).
+    const next = idx === 0;
+    (onChange as (k: string, v: unknown) => void)(f.toggleKey, next);
+  }
+
   return (
     <Box flexDirection="column" width={width} height={height}>
       <Box flexShrink={0} marginBottom={1}>
@@ -360,43 +362,37 @@ export function SettingsPanel({
       </Box>
       {FIELDS.map((f, i) => {
         const fieldSelected = i === fieldIdx;
-        const showStatus = f.kind === "path" && f.showStatus;
-        const claudeStatus = sessionStatusBySource["claude-code"];
-        const statusColor = claudeStatus === "ok" ? OK : DANGER;
-        const statusKey =
-          claudeStatus === "ok"
-            ? "settings.session_status.ok"
-            : "settings.session_status.missing";
+        const fieldFocused = fieldSelected && focused;
         return (
-          <Box key={f.key} flexDirection="column" marginBottom={1}>
-            <Box>
-              <Text color={fieldSelected && focused ? ACCENT : undefined} bold={fieldSelected && focused}>
-                {fieldSelected && focused ? "› " : "  "}{f.title}
-              </Text>
-              {showStatus && (
-                <Text>
-                  <Text>{"  "}</Text>
-                  <Text color={statusColor} bold>● </Text>
-                  <Text color={statusColor}>{t(lang, statusKey)}</Text>
-                </Text>
-              )}
-            </Box>
+          <Box key={fieldKey(f)} flexDirection="column" marginBottom={1}>
             {f.kind === "options" ? (
-              <OptionsRow
-                field={f}
-                applied={settings[f.key]}
-                cursorIdx={optionCursor[f.key] ?? 0}
-                fieldFocused={fieldSelected && focused}
-              />
+              <>
+                <Box>
+                  <Text color={fieldFocused ? ACCENT : undefined} bold={fieldFocused}>
+                    {fieldFocused ? "› " : "  "}{f.title}
+                  </Text>
+                </Box>
+                <OptionsRow
+                  field={f}
+                  applied={settings[f.key]}
+                  cursorIdx={optionCursor[f.key] ?? 0}
+                  fieldFocused={fieldFocused}
+                />
+              </>
             ) : (
-              <PathRow
+              <SourceRow
                 field={f}
-                draft={pathDrafts[f.key]}
+                draft={pathDrafts[f.pathKey]}
                 onDraftChange={(v) =>
-                  setPathDrafts(prev => ({ ...prev, [f.key]: v }))
+                  setPathDrafts(prev => ({ ...prev, [f.pathKey]: v }))
                 }
-                subCursor={pathSubCursor}
-                fieldFocused={fieldSelected && focused}
+                subCursor={sourceSubCursor}
+                fieldFocused={fieldFocused}
+                status={sessionStatusBySource[f.source]}
+                toggleApplied={settings[f.toggleKey]}
+                toggleCursorIdx={optionCursor[f.toggleKey] ?? 0}
+                lang={lang}
+                width={width}
               />
             )}
           </Box>
@@ -439,24 +435,53 @@ function OptionsRow<F extends OptionsFieldDef>({
   );
 }
 
-function PathRow({
+function SourceRow({
   field,
   draft,
   onDraftChange,
   subCursor,
   fieldFocused,
+  status,
+  toggleApplied,
+  toggleCursorIdx,
+  lang,
+  width,
 }: {
-  field: PathFieldDef;
+  field: SourceFieldDef;
   draft: string;
   onDraftChange: (v: string) => void;
-  subCursor: PathSubCursor;
+  subCursor: SourceSubCursor;
   fieldFocused: boolean;
+  status: SourceStatus;
+  toggleApplied: boolean;
+  toggleCursorIdx: number;
+  lang: Lang;
+  width: number;
 }) {
   const inputFocused = fieldFocused && subCursor === "input";
   const restoreFocused = fieldFocused && subCursor === "restore";
+  const toggleFocused = fieldFocused && subCursor === "toggle";
+
   return (
     <>
+      <Box flexDirection="row" justifyContent="space-between" width={width}>
+        <Box>
+          <Text color={fieldFocused ? ACCENT : undefined} bold={fieldFocused}>
+            {fieldFocused ? "› " : "  "}{field.title}
+          </Text>
+        </Box>
+        <Box>
+          <Toggle
+            applied={toggleApplied}
+            cursorIdx={toggleCursorIdx}
+            focused={toggleFocused}
+            lang={lang}
+          />
+        </Box>
+      </Box>
       <Box marginLeft={2}>
+        <StatusBadge status={status} lang={lang} />
+        <Text dimColor>{" · "}</Text>
         <Text dimColor>{field.defaultLabel}</Text>
       </Box>
       <Box marginLeft={2} flexDirection="row">
@@ -471,13 +496,60 @@ function PathRow({
           />
         )}
       </Box>
-      <Box marginLeft={2} marginTop={0}>
+      <Box marginLeft={2}>
         <RestoreButton label={field.restoreLabel} cursor={restoreFocused} />
       </Box>
       <Box marginLeft={2}>
         <Text dimColor>{field.description}</Text>
       </Box>
     </>
+  );
+}
+
+function Toggle({
+  applied,
+  cursorIdx,
+  focused,
+  lang,
+}: {
+  applied: boolean;
+  cursorIdx: number;
+  focused: boolean;
+  lang: Lang;
+}) {
+  const onLabel = t(lang, "settings.show_source.on");
+  const offLabel = t(lang, "settings.show_source.off");
+  const onCursor = focused && cursorIdx === 0;
+  const offCursor = focused && cursorIdx === 1;
+  return (
+    <>
+      <Option label={onLabel} applied={applied === true} cursor={onCursor} />
+      <Box marginLeft={2}>
+        <Option label={offLabel} applied={applied === false} cursor={offCursor} />
+      </Box>
+    </>
+  );
+}
+
+function StatusBadge({ status, lang }: { status: SourceStatus; lang: Lang }) {
+  if (status === "hidden") {
+    return (
+      <Text>
+        <Text dimColor>— </Text>
+        <Text dimColor>{t(lang, "settings.session_status.hidden")}</Text>
+      </Text>
+    );
+  }
+  const color = status === "ok" ? OK : DANGER;
+  const key =
+    status === "ok"
+      ? "settings.session_status.ok"
+      : "settings.session_status.missing";
+  return (
+    <Text>
+      <Text color={color} bold>● </Text>
+      <Text color={color}>{t(lang, key)}</Text>
+    </Text>
   );
 }
 
@@ -516,12 +588,20 @@ function RestoreButton({ label, cursor }: { label: string; cursor: boolean }) {
   );
 }
 
+function fieldKey(f: FieldDef): string {
+  return f.kind === "options" ? f.key : f.pathKey;
+}
+
 function initialCursor(fields: FieldDef[], settings: Settings): Record<string, number> {
   const out: Record<string, number> = {};
   for (const f of fields) {
-    if (f.kind !== "options") continue;
-    const i = f.options.findIndex(o => o.value === settings[f.key]);
-    out[f.key] = i >= 0 ? i : 0;
+    if (f.kind === "options") {
+      const i = f.options.findIndex(o => o.value === settings[f.key]);
+      out[f.key] = i >= 0 ? i : 0;
+    } else if (f.kind === "source") {
+      // Toggle cursor: 0 = On, 1 = Off.
+      out[f.toggleKey] = settings[f.toggleKey] ? 0 : 1;
+    }
   }
   return out;
 }
