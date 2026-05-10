@@ -214,7 +214,7 @@ New verification (manual, via `bun run dev`):
    row shows red `● No valid session found`.
 4. Tab cycles `input → restore → toggle → input` on each source row.
 5. ←/→ on toggle moves cursor; Space applies; persisted to
-   `~/openctx/settings.json`.
+   `~/.openctx/settings.json`.
 6. Restore button still clears path draft and applied setting
    (regression check).
 7. Closing and reopening the panel re-anchors the toggle cursor on

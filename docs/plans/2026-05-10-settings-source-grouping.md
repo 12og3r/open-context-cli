@@ -1161,7 +1161,7 @@ The unit + render tests cover state-shape and per-status rendering, but the keyb
 
 - [ ] **Step 1: Launch the dev runner**
 
-Run: `bun run dev` in a terminal where settings live at `~/openctx/settings.json`.
+Run: `bun run dev` in a terminal where settings live at `~/.openctx/settings.json`.
 
 - [ ] **Step 2: Scenario 1 — both sources enabled with valid paths**
 
@@ -1191,13 +1191,13 @@ Expected: cursor moves `input → restore button → toggle → input → ...`. 
 
 Action: toggle a source off; quit the app with `q`.
 
-Verify: `cat ~/openctx/settings.json` shows the corresponding `showCodex` (or `showClaudeCode`) is `false`. Re-launch `bun run dev`; the badge is `Hidden` from the start.
+Verify: `cat ~/.openctx/settings.json` shows the corresponding `showCodex` (or `showClaudeCode`) is `false`. Re-launch `bun run dev`; the badge is `Hidden` from the start.
 
 - [ ] **Step 7: Scenario 6 — Restore button still works**
 
 Action: type a custom path into the Claude input; Tab to restore; Space.
 
-Expected: input clears (placeholder `(using default)` reappears), and on close the saved `sessionsDir` becomes `""` again (`cat ~/openctx/settings.json`).
+Expected: input clears (placeholder `(using default)` reappears), and on close the saved `sessionsDir` becomes `""` again (`cat ~/.openctx/settings.json`).
 
 - [ ] **Step 8: Scenario 7 — Cursor re-anchors on reopen**
 

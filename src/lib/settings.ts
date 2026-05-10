@@ -50,7 +50,7 @@ export function enabledSourcesFromSettings(s: Settings): Record<Source, boolean>
 }
 
 export function settingsDir(): string {
-  return path.join(os.homedir(), "openctx");
+  return path.join(os.homedir(), ".openctx");
 }
 
 export function settingsPath(): string {
