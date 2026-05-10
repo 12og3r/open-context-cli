@@ -103,9 +103,10 @@ bun run build        # bundles to dist/cli.js
 
 ## Settings file location
 
-Lives at `~/open-ctx/settings.json`. Was at `~/.context-cli/.settings.json`
-before the rename — if the user mentions settings disappearing after an
-upgrade, that's why.
+Lives at `~/openctx/settings.json`. Previously `~/open-ctx/settings.json`,
+and before that `~/.context-cli/.settings.json` — if the user mentions
+settings disappearing after an upgrade, that's why. Migrate with
+`mv ~/open-ctx ~/openctx` (or copy the JSON over).
 
 ## PTY runtime selection
 

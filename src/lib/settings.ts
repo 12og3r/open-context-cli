@@ -27,7 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 export function settingsDir(): string {
-  return path.join(os.homedir(), "open-ctx");
+  return path.join(os.homedir(), "openctx");
 }
 
 export function settingsPath(): string {
