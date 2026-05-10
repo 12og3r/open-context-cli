@@ -41,7 +41,6 @@ type SourceFieldDef = {
   title: string;
   defaultLabel: string;
   restoreLabel: string;
-  placeholder: string;
 };
 
 type FieldDef = OptionsFieldDef | SourceFieldDef;
@@ -62,7 +61,6 @@ function buildFields(
         path: defaultClaudeDir || "—",
       }),
       restoreLabel: t(lang, "settings.sessions_dir.restore"),
-      placeholder: t(lang, "settings.sessions_dir.placeholder"),
     },
     {
       kind: "source",
@@ -74,7 +72,6 @@ function buildFields(
         path: defaultCodexDir || "—",
       }),
       restoreLabel: t(lang, "settings.sessions_dir.restore"),
-      placeholder: t(lang, "settings.sessions_dir.placeholder"),
     },
     {
       kind: "options",
@@ -475,20 +472,22 @@ function SourceRow({
           />
         </Box>
       </Box>
-      <Box marginLeft={2} flexShrink={0}>
-        <Text dimColor>{field.defaultLabel}</Text>
-      </Box>
+      {/*
+        The default-path label is shown INSIDE the input as the
+        placeholder when no draft has been typed. We disable
+        ink-text-input's built-in inverse-block cursor and render a thin
+        `│` of our own to the left so the cursor never overlays the
+        first character of the placeholder or the typed value.
+      */}
       <Box marginLeft={2} flexDirection="row" flexShrink={0}>
-        <Text color={inputFocused ? ACCENT : undefined}>{inputFocused ? "▍ " : "  "}</Text>
-        {draft.length === 0 && !inputFocused ? (
-          <Text dimColor>{field.placeholder}</Text>
-        ) : (
-          <TextInput
-            value={draft}
-            onChange={onDraftChange}
-            focus={inputFocused}
-          />
-        )}
+        <Text color={inputFocused ? ACCENT : undefined}>{inputFocused ? "│ " : "  "}</Text>
+        <TextInput
+          value={draft}
+          onChange={onDraftChange}
+          focus={inputFocused}
+          placeholder={field.defaultLabel}
+          showCursor={false}
+        />
       </Box>
       <Box marginLeft={2} flexShrink={0}>
         <RestoreButton label={field.restoreLabel} cursor={restoreFocused} />

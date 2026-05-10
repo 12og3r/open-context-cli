@@ -121,7 +121,7 @@ describe("SettingsPanel source rows", () => {
     // Caret + typed value must both be on a row that survives layout.
     const inputLine = out.split("\n").find(l => l.includes("abc"));
     expect(inputLine).toBeDefined();
-    expect(inputLine!).toContain("▍");
+    expect(inputLine!).toContain("│");
   });
 
   test("after the Tab cycle returns to input, typing still works", async () => {
