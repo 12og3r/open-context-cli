@@ -38,8 +38,7 @@ bun run dev
 ## Usage
 
 ```bash
-openctx                      # scan ~/.claude/projects
-openctx --path ./logs        # use a custom directory or a single .jsonl
+openctx                      # scan ~/.claude/projects and ~/.codex/sessions
 openctx --no-emoji           # plain role labels instead of emoji
 openctx update               # reinstall to the latest version
 openctx update 0.2.0         # pin a specific version
@@ -126,10 +125,6 @@ Both source directories are configurable in the Settings panel
 (Claude Code sessions directory, Codex sessions directory), and each
 source can be hidden independently. The defaults honor the
 `CLAUDE_CONFIG_DIR` and `CODEX_HOME` environment variables when set.
-
-You can also point `--path` at any directory of `.jsonl` files, or at a single
-file, to inspect transcripts that live elsewhere — `--path` puts `openctx`
-into single-source mode (Codex is hidden while it's set).
 
 ## Architecture
 

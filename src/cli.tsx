@@ -6,24 +6,22 @@ import type { ContinueRequest } from "./lib/continue-types.ts";
 import { trace } from "./lib/debug-trace.ts";
 import pkg from "../package.json" with { type: "json" };
 
-function parseArgs(argv: string[]): { path?: string; emoji: boolean } {
-  let path: string | undefined;
+function parseArgs(argv: string[]): { emoji: boolean } {
   let emoji = process.env.CLAUDE_HISTORY_NO_EMOJI === "1" ? false : true;
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--path") { path = argv[i + 1]; i++; }
-    else if (a === "--no-emoji") { emoji = false; }
+    if (a === "--no-emoji") { emoji = false; }
     else if (a === "--help" || a === "-h") { printHelp(); process.exit(0); }
     else if (a === "--version" || a === "-v") { process.stdout.write(`${pkg.version}\n`); process.exit(0); }
   }
-  return { path, emoji };
+  return { emoji };
 }
 
 function printHelp() {
   process.stdout.write(`openctx ${pkg.version} — browse local Claude Code and Codex session history
 
 Usage:
-  openctx [--path <dir-or-file>] [--no-emoji]
+  openctx [--no-emoji]
   openctx update [<version>]
   openctx --version
   openctx --help
@@ -34,13 +32,11 @@ Commands:
                        version (e.g. \`0.2.0\`) to pin; omit to take latest.
 
 Options:
-  --path <p>         Use <p> as the Claude Code session root instead of
-                     ~/.claude/projects. Codex is hidden while --path is set;
-                     for normal multi-source browsing, omit --path and use
-                     the Settings panel to configure each source's directory.
   --no-emoji         Render plain role labels instead of emoji.
   -v, --version      Print the openctx version and exit.
   -h, --help         Print this help and exit.
+
+Configure session directories per source from the in-app Settings panel.
 `);
 }
 
@@ -53,14 +49,13 @@ if (process.argv[2] === "update") {
   process.exit(await runUpdate({ version: process.argv[3] }));
 }
 
-const { path: initialPath, emoji } = parseArgs(process.argv);
+const { emoji } = parseArgs(process.argv);
 
 // Mutable holder so TypeScript doesn't narrow the inner field to its initial
 // `null` value when the closure assigns into it asynchronously.
 const slot: { req: ContinueRequest | null } = { req: null };
 const inkApp = render(
   <App
-    initialPath={initialPath}
     emoji={emoji}
     onRequestContinue={(req) => { slot.req = req; }}
   />,

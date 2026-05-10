@@ -38,11 +38,9 @@ type AppState =
     };
 
 export function App({
-  initialPath,
   emoji = true,
   onRequestContinue,
 }: {
-  initialPath?: string;
   emoji?: boolean;
   onRequestContinue?: (req: ContinueRequest) => void;
 }) {
@@ -50,23 +48,16 @@ export function App({
   const { settings, update: updateSetting } = useSettings();
   const lang = settings.language;
 
-  // CLI --path is a Claude-only override (Codex's YYYY/MM/DD layout means
-  // an arbitrary `--path` rarely makes sense for it). When set, we point
-  // Claude at that path and disable Codex entirely so the user gets the
-  // single-path browser they asked for.
-  const enabled: Enabled = useMemo(() => {
-    if (initialPath) return { "claude-code": true, "codex": false };
-    return enabledSourcesFromSettings(settings);
-  }, [initialPath, settings.showClaudeCode, settings.showCodex]);
+  const enabled: Enabled = useMemo(
+    () => enabledSourcesFromSettings(settings),
+    [settings.showClaudeCode, settings.showCodex],
+  );
 
-  // Per-source roots. Resolution order: CLI flag (Claude only) > saved
-  // setting > provider default.
+  // Per-source roots. Resolution order: saved setting > provider default.
   const roots: Roots = useMemo(() => ({
-    "claude-code": expandHome(
-      initialPath || settings.sessionsDir || claudeProjectsDir(),
-    ),
+    "claude-code": expandHome(settings.sessionsDir || claudeProjectsDir()),
     "codex": expandHome(settings.codexSessionsDir || codexSessionsDir()),
-  }), [initialPath, settings.sessionsDir, settings.codexSessionsDir]);
+  }), [settings.sessionsDir, settings.codexSessionsDir]);
 
   const [state, setState] = useState<AppState>(() => ({
     kind: "scanning", roots, enabled,
