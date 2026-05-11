@@ -75,7 +75,7 @@ export async function executeContinueClaude(req: ContinueRequest): Promise<Conti
 
   // mode === "new-window"
   try {
-    await spawnNewWindow({ cwd, command, userText: req.userText });
+    await spawnNewWindow({ cwd, command, prefillText: req.userText });
     return { ok: true };
   } catch (e) {
     await silentRemove(dstPath);

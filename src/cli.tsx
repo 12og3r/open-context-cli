@@ -49,6 +49,42 @@ if (process.argv[2] === "update") {
   process.exit(await runUpdate({ version: process.argv[3] }));
 }
 
+// `openctx __launch <spec-path>` — internal subcommand used by the
+// new-window flow. The parent openctx writes a LaunchSpec to disk
+// and asks the user's terminal to open a fresh window running this
+// subcommand; we read the spec, delete it, and PTY-spawn the target
+// (claude/codex) right here. Ink never mounts on this path.
+//
+// Doing it this way (vs. launching claude/codex directly in the new
+// window with the prompt as a positional arg) means the new window
+// gets the same prefill-via-bracketed-paste behavior as same-window
+// mode: text shows up in the input box but is NOT auto-sent — the
+// user reviews and presses Enter.
+if (process.argv[2] === "__launch") {
+  const specPath = process.argv[3];
+  if (!specPath) {
+    process.stderr.write("openctx __launch: missing spec path\n");
+    process.exit(2);
+  }
+  const { consumeLaunchSpec } = await import("./lib/launch-spec.ts");
+  const { runPty } = await import("./lib/continue-pty.ts");
+  try {
+    const spec = await consumeLaunchSpec(specPath);
+    if (spec.env) {
+      for (const [k, v] of Object.entries(spec.env)) process.env[k] = v;
+    }
+    const code = await runPty({
+      cwd: spec.cwd,
+      command: spec.command,
+      prefillText: spec.prefillText,
+    });
+    process.exit(code);
+  } catch (e) {
+    process.stderr.write(`openctx __launch: ${(e as Error).message}\n`);
+    process.exit(1);
+  }
+}
+
 const { emoji } = parseArgs(process.argv);
 
 // Mutable holder so TypeScript doesn't narrow the inner field to its initial
