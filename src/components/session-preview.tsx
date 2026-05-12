@@ -71,6 +71,13 @@ export function SessionPreview({
   // confirm row and ordinary preview navigation is suppressed. Enter confirms,
   // Esc cancels.
   const [continueOpen, setContinueOpen] = useState(false);
+  // Acceleration state for arrow-key navigation: as the user holds j/k or the
+  // arrow keys, the OS fires repeat events ~25-30 Hz. Consecutive same-direction
+  // events within ACCEL_WINDOW_MS grow the streak counter; the step size scales
+  // up so a long hold scrolls fast while a tap still moves one line.
+  const accelRef = useRef<{ dir: 1 | -1 | 0; count: number; lastTs: number }>({
+    dir: 0, count: 0, lastTs: 0,
+  });
   // continueError: set when a pre-launch check (source file missing, project
   // dir missing, claude not on PATH) reports failure. Shown red (or yellow
   // when forceMode) beneath the footer; cleared on Esc.
@@ -415,8 +422,8 @@ export function SessionPreview({
       openSearchFresh();
       return;
     }
-    if (input === "j" || key.downArrow) step(1);
-    else if (input === "k" || key.upArrow) step(-1);
+    if (input === "j" || key.downArrow) step(accelStep(1, accelRef));
+    else if (input === "k" || key.upArrow) step(accelStep(-1, accelRef));
     else if (key.ctrl && input === "d") step(Math.floor(viewportHeight / 2));
     else if (key.ctrl && input === "u") step(-Math.floor(viewportHeight / 2));
     else if (key.pageDown) step(viewportHeight);
@@ -591,4 +598,36 @@ function clampToRange(n: number, lo: number, hi: number): number {
   if (n < lo) return lo;
   if (n > hi) return hi;
   return n;
+}
+
+// Window in which consecutive same-direction nav events count as a held key.
+// Keyboard auto-repeat fires at ~25-30 Hz (~33-40 ms apart); 180 ms keeps the
+// streak alive across that without latching onto deliberate manual repeats.
+const ACCEL_WINDOW_MS = 180;
+
+// Stepwise ramp instead of a continuous function — feels more controllable in
+// a TUI because the user can predict the jumps. A short hold still gives
+// line-by-line precision; the cap stays modest (4 lines/event) so scrolling
+// never overshoots far past where the user wanted to land.
+function accelMagnitude(streak: number): number {
+  if (streak < 3) return 1;
+  if (streak < 7) return 2;
+  if (streak < 14) return 3;
+  return 4;
+}
+
+function accelStep(
+  dir: 1 | -1,
+  ref: React.MutableRefObject<{ dir: 1 | -1 | 0; count: number; lastTs: number }>,
+): number {
+  const now = Date.now();
+  const a = ref.current;
+  if (a.dir === dir && now - a.lastTs < ACCEL_WINDOW_MS) {
+    a.count += 1;
+  } else {
+    a.dir = dir;
+    a.count = 1;
+  }
+  a.lastTs = now;
+  return dir * accelMagnitude(a.count);
 }

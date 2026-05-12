@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Box, Text } from "ink";
 import type { SessionMeta, Source } from "../providers/types.ts";
 import { relativeTime } from "../lib/relative-time.ts";
@@ -43,7 +43,8 @@ export function SessionList({
 }) {
   const lang = useLang();
   const innerWidth = Math.max(1, width);
-  const visible = windowSessions(sessions, selectedId, height);
+  const windowStartRef = useRef(0);
+  const visible = windowSessions(sessions, selectedId, height, windowStartRef);
 
   return (
     <Box flexDirection="column" width={width} flexShrink={0}>
@@ -57,22 +58,32 @@ export function SessionList({
   );
 }
 
+// Scroll-on-edge windowing: the window only shifts when the selection crosses
+// out of the currently visible range. Moving down within the visible block
+// keeps the window pinned; pressing down on the last visible row shifts the
+// window down by one. The ref persists `start` across renders so we don't
+// snap back to a centered position on every selection change.
 function windowSessions(
   sessions: SessionMeta[],
   selectedId: string | null,
   height: number | undefined,
+  startRef: React.MutableRefObject<number>,
 ): SessionMeta[] {
   if (!height || height <= 0) return sessions;
   const capacity = Math.max(1, Math.floor((height + ROWS_PER_GAP) / ROWS_PER_BLOCK));
-  if (sessions.length <= capacity) return sessions;
+  if (sessions.length <= capacity) {
+    startRef.current = 0;
+    return sessions;
+  }
   const selectedIdx = Math.max(0, sessions.findIndex(s => s.id === selectedId));
-  const half = Math.floor(capacity / 2);
-  let start = selectedIdx - half;
-  let end = start + capacity;
-  if (start < 0) { end -= start; start = 0; }
-  if (end > sessions.length) { start -= end - sessions.length; end = sessions.length; }
-  start = Math.max(0, start);
-  return sessions.slice(start, end);
+  let start = startRef.current;
+  if (selectedIdx < start) start = selectedIdx;
+  else if (selectedIdx >= start + capacity) start = selectedIdx - capacity + 1;
+  const maxStart = Math.max(0, sessions.length - capacity);
+  if (start > maxStart) start = maxStart;
+  if (start < 0) start = 0;
+  startRef.current = start;
+  return sessions.slice(start, start + capacity);
 }
 
 function Item({ meta, selected, innerWidth, now, lang }: {

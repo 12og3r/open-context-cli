@@ -72,4 +72,56 @@ describe("SessionList", () => {
     const lines = (lastFrame() ?? "").split("\n");
     expect(lines.some(l => l.includes("▌") && l.includes("Refactor parser"))).toBe(true);
   });
+
+  test("scrolls only when the selection crosses an edge of the visible window", () => {
+    // capacity = floor((height + ROWS_PER_GAP) / ROWS_PER_BLOCK)
+    //         = floor((14 + 1) / 3) = 5
+    const many: SessionMeta[] = Array.from({ length: 10 }, (_, i) => ({
+      id: `s${i}`,
+      filePath: `/${i}.jsonl`,
+      summary: `Session ${i}`,
+      projectPath: "/p",
+      modifiedAt: new Date("2026-05-07T10:00:00Z"),
+      messageCount: 1,
+      source: "claude-code" as const,
+    }));
+
+    const { lastFrame, rerender } = render(
+      <SessionList sessions={many} selectedId="s0" width={60} height={14} now={NOW} />
+    );
+    // Initial window: items 0..4 visible, items 5..9 not.
+    let out = lastFrame() ?? "";
+    expect(out).toContain("Session 0");
+    expect(out).toContain("Session 4");
+    expect(out).not.toContain("Session 5");
+
+    // Selecting the last visible row should NOT shift the window.
+    rerender(<SessionList sessions={many} selectedId="s4" width={60} height={14} now={NOW} />);
+    out = lastFrame() ?? "";
+    expect(out).toContain("Session 0");
+    expect(out).toContain("Session 4");
+    expect(out).not.toContain("Session 5");
+
+    // Crossing past the bottom edge shifts the window down by one only.
+    rerender(<SessionList sessions={many} selectedId="s5" width={60} height={14} now={NOW} />);
+    out = lastFrame() ?? "";
+    expect(out).not.toContain("Session 0");
+    expect(out).toContain("Session 1");
+    expect(out).toContain("Session 5");
+    expect(out).not.toContain("Session 6");
+
+    // Moving back within the window does not shift it.
+    rerender(<SessionList sessions={many} selectedId="s2" width={60} height={14} now={NOW} />);
+    out = lastFrame() ?? "";
+    expect(out).not.toContain("Session 0");
+    expect(out).toContain("Session 1");
+    expect(out).toContain("Session 5");
+
+    // Crossing past the top edge shifts the window up.
+    rerender(<SessionList sessions={many} selectedId="s0" width={60} height={14} now={NOW} />);
+    out = lastFrame() ?? "";
+    expect(out).toContain("Session 0");
+    expect(out).toContain("Session 4");
+    expect(out).not.toContain("Session 5");
+  });
 });
