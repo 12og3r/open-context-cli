@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>openctx — find any session, in a keystroke</title>
+  <meta name="description" content="A keyboard-first browser for every Claude Code and Codex CLI conversation you've ever had." />
+  <meta name="theme-color" content="#F4F5F7" media="(prefers-color-scheme: light)" />
+
+  <meta property="og:title" content="openctx" />
+  <meta property="og:description" content="Find any session, in a keystroke." />
+  <meta property="og:url" content="https://12og3r.github.io/open-context-cli/" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- critical inline CSS — covers the brief window before stylesheet arrives -->
+  <style>
+    html, body { margin: 0; background: #F4F5F7; }
+    body.boot-locked { overflow: hidden; }
+    body.boot-locked .nav,
+    body.boot-locked main,
+    body.boot-locked .foot { visibility: hidden; }
+    .boot {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #0B0D10;
+      display: grid; place-items: center;
+      overflow: hidden;
+      perspective: 1400px;
+      perspective-origin: 50% 42%;
+      contain: strict;
+    }
+    /* Skip path: boot.js sets html.boot-skip synchronously when bypassing the intro.
+       Render the page immediately without the dark flash. */
+    html.boot-skip .boot { display: none !important; }
+    html.boot-skip body.boot-locked { overflow: visible !important; }
+    html.boot-skip body.boot-locked .nav,
+    html.boot-skip body.boot-locked main,
+    html.boot-skip body.boot-locked .foot { visibility: visible !important; }
+    @media (prefers-reduced-motion: reduce) {
+      .boot { display: none !important; }
+      body.boot-locked { overflow: visible !important; }
+      body.boot-locked .nav,
+      body.boot-locked main,
+      body.boot-locked .foot { visibility: visible !important; }
+    }
+  </style>
+
+  <script src="boot.js"></script>
+</head>
+<body class="boot-locked">
+
+  <!-- ─────────────────── BOOT 3D STAGE ─────────────────── -->
+  <div class="boot" id="boot" role="presentation" aria-hidden="true">
+    <div class="boot__stage" id="boot-stage">
+      <!-- caret: spawns first, becomes the page's mascot -->
+      <span class="boot__caret" id="boot-caret">▌</span>
+      <!-- logotype glyphs injected here by boot.js -->
+      <span class="boot__logotype" id="boot-logotype"></span>
+      <!-- timestamp fragments injected here by boot.js (8 of them) -->
+      <span class="boot__rain" id="boot-rain"></span>
+      <!-- post-thunk halo + underline -->
+      <span class="boot__halo" id="boot-halo"></span>
+      <span class="boot__underline" id="boot-underline"></span>
+    </div>
+    <button type="button" class="boot__skip" id="boot-skip" aria-label="Skip intro animation">
+      <span>skip</span><span class="boot__skip-key">esc</span>
+    </button>
+  </div>
+
+  <!-- ─────────────────── NAV ─────────────────── -->
+  <header class="nav">
+    <a class="brand" href="#top" aria-label="openctx home">
+      <span class="brand__name">openctx</span>
+      <span class="brand__v" id="brand-v">v0.2.6</span>
+    </a>
+    <nav class="nav__menu" aria-label="primary">
+      <a href="#features"><span class="nav__no">01</span> Features</a>
+      <a href="#faq"><span class="nav__no">02</span> FAQ</a>
+      <a href="https://github.com/12og3r/open-context-cli" target="_blank" rel="noopener" class="nav__ext"><span class="nav__no">↗</span> GitHub</a>
+    </nav>
+  </header>
+
+  <main id="top">
+
+    <!-- ──────── HERO · marquee · asymmetric ──────── -->
+    <section class="hero" data-section="hero" data-label="Hero">
+      <div class="hero__perspective-grid" aria-hidden="true"></div>
+
+      <div class="hero__head">
+        <div class="hero__copy">
+          <h1 class="hero__wordmark">
+            <span class="hero__wordmark-text">openctx</span>
+          </h1>
+          <p class="hero__tagline">
+            <span class="hero__tagline-l1">Find any session.</span>
+            <span class="hero__tagline-l2">In a keystroke.</span>
+          </p>
+          <p class="hero__sub">
+            A keyboard-first browser for every Claude Code <span class="hero__sub-amp">&amp;</span> Codex conversation you've ever had.
+          </p>
+        </div>
+
+        <div class="hero__cta">
+          <button
+            class="install"
+            type="button"
+            data-copy="npm install -g @12og3r/openctx"
+            aria-label="Copy install command"
+          >
+            <span class="install__shell">$</span>
+            <span class="install__cmd">npm install -g <strong><span class="install__scope">@12og3r/</span>openctx</strong></span>
+            <span class="install__sep" aria-hidden="true"></span>
+            <span class="install__action">
+              <svg class="icon-copy" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="9" y="9" width="11" height="11" rx="1.6"/>
+                <path d="M5 15V6a1.4 1.4 0 0 1 1.4-1.4H15"/>
+              </svg>
+              <svg class="icon-check" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 12.5l5 5L20 6.5"/>
+              </svg>
+              <span class="install__label">Copy</span>
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- THE preview — docked TUI auto-pilot demo -->
+      <figure class="hero__product" id="docked-tui" aria-label="openctx live preview">
+        <header class="window__bar">
+          <span class="window__lights"><span></span><span></span><span></span></span>
+          <span class="window__title">openctx — auto-pilot</span>
+          <span class="window__indicator"><span class="dot"></span> live</span>
+        </header>
+
+        <div class="tui">
+          <div class="tui__panes">
+            <section class="pane pane--list" data-focused="true">
+              <h3 class="pane__title">
+                <span class="pane__title-text">SESSIONS</span>
+                <span class="pane__title-meta">24</span>
+              </h3>
+              <div class="pane__body session-list" id="session-list-lg"></div>
+              <div class="pane__featurebar">
+                <span class="feature-item is-active"><span class="feature-item__ico">≡</span> Settings</span>
+                <span class="feature-item"><span class="feature-item__ico">×</span> Delete</span>
+              </div>
+            </section>
+
+            <section class="pane pane--preview">
+              <h3 class="pane__title">
+                <span class="pane__title-text">PREVIEW</span>
+                <span class="pane__title-meta" id="pane-path-lg">~/projects/api</span>
+              </h3>
+              <div class="pane__body conversation" id="conversation-lg"></div>
+            </section>
+          </div>
+
+          <footer class="tui__footer" id="tui-footer-lg">
+            <span class="tui__footer-keys">↑↓ select</span>
+            <span class="tui__footer-sep">·</span>
+            <span class="tui__footer-keys">⏎ focus preview</span>
+            <span class="tui__footer-sep">·</span>
+            <span class="tui__footer-keys">⇥ menu</span>
+            <span class="tui__footer-sep">·</span>
+            <span class="tui__footer-keys">q quit</span>
+          </footer>
+
+          <div class="keystroke" id="keystroke-lg" aria-hidden="true">↓</div>
+        </div>
+      </figure>
+
+    </section>
+
+    <!-- ──────── PROBLEM BEAT · dark slab · sticky diagonal ──────── -->
+    <section class="problem" data-section="problem" data-label="Memory">
+      <div class="problem__inner">
+        <p class="problem__line" data-reveal>
+          <em>Your memory ends</em>
+          <em class="problem__line-2">where the terminal scrolls.</em>
+        </p>
+
+        <pre class="problem__tree" aria-hidden="true" data-reveal>
+<span class="ptree-h">~/.claude/projects/</span>
+├── <span class="ptree-d">-Users-roger-projects-api/</span>
+│   ├── 2025-04-12-jwt-validation.jsonl
+│   ├── 2025-05-03-rate-limiting.jsonl
+│   └── …
+├── <span class="ptree-d">-Users-roger-projects-openctx/</span>
+│   ├── ink-renderer-bug.jsonl
+│   └── …
+└── <span class="ptree-d">-Users-roger-projects-billing/</span>
+
+<span class="ptree-h">~/.codex/sessions/</span>
+└── <span class="ptree-d">2025/05/</span>
+    ├── 12/rollout-22:14-a4f3.jsonl
+    └── 14/rollout-09:45-7c1e.jsonl
+
+<span class="ptree-lost">  1,247 sessions · 14 GB · last opened: never</span></pre>
+
+        <p class="problem__sub" data-reveal>
+          The plans you drafted. The bugs you solved. The patterns you taught.
+          All saved to JSONL files in a folder you'll never open.
+        </p>
+      </div>
+    </section>
+
+    <!-- ──────── CAPABILITIES · 3 cinemascope strips ──────── -->
+    <section class="features" id="features" data-section="features" data-label="Features">
+      <!-- Strip 1 — Signal Blue wash · Unified history -->
+      <article class="strip strip--signal" data-motion="manuscript-rise">
+        <div class="strip__bg" aria-hidden="true"></div>
+        <div class="strip__inner">
+          <div class="strip__text">
+            <p class="strip__no" data-motion-child>01</p>
+            <h2 class="strip__title" data-motion-child>
+              Two CLIs, <em>one pane.</em>
+            </h2>
+            <p class="strip__body" data-motion-child>
+              Reads <code>~/.claude/projects/</code> and <code>~/.codex/sessions/</code>
+              into the same view. Every row is tagged with the source CLI so you
+              know which tool ran the conversation.
+            </p>
+            <ul class="strip__bullets" data-motion-child>
+              <li><span class="strip__chip strip__chip--cc">CC</span> Claude Code JSONL</li>
+              <li><span class="strip__chip strip__chip--cx">CX</span> Codex CLI rollouts</li>
+            </ul>
+          </div>
+          <figure class="strip__visual" data-motion-child>
+            <div class="snap snap--list">
+              <header class="snap__bar">
+                <span class="snap__lights"><span></span><span></span><span></span></span>
+                <span class="snap__title">SESSIONS · 24</span>
+              </header>
+              <div class="snap__body">
+                <div class="snap__row is-active" data-src="cc">▌ <span class="snap__sum">auth-rework</span><br/><span class="snap__chip-cc">[Claude]</span> <span class="snap__rest">1m ago · 355 msgs</span></div>
+                <div class="snap__row" data-src="cc">  <span class="snap__sum">ink-renderer-bug</span><br/><span class="snap__chip-cc">[Claude]</span> <span class="snap__rest">3h ago · 124 msgs</span></div>
+                <div class="snap__row" data-src="cx">  <span class="snap__sum">sql-migrations</span><br/><span class="snap__chip-cx">[Codex]</span> <span class="snap__rest">yesterday · 89 msgs</span></div>
+                <div class="snap__row" data-src="cc">  <span class="snap__sum">type-narrowing</span><br/><span class="snap__chip-cc">[Claude]</span> <span class="snap__rest">2d · 47 msgs</span></div>
+                <div class="snap__row" data-src="cx">  <span class="snap__sum">landing-page-design</span><br/><span class="snap__chip-cx">[Codex]</span> <span class="snap__rest">2d · 73 msgs</span></div>
+              </div>
+            </div>
+          </figure>
+        </div>
+      </article>
+
+      <!-- Strip 2 — Ember wash · Search -->
+      <article class="strip strip--ember strip--reverse" data-motion="manuscript-rise">
+        <div class="strip__bg" aria-hidden="true"></div>
+        <div class="strip__inner">
+          <div class="strip__text">
+            <p class="strip__no" data-motion-child>02</p>
+            <h2 class="strip__title" data-motion-child>
+              <em>Find</em> what you wrote.
+            </h2>
+            <p class="strip__body" data-motion-child>
+              Hit <kbd>Ctrl-F</kbd> in the preview. Every match across the
+              conversation lights up. The counter ticks as you cycle —
+              <kbd>⏎</kbd> next, <kbd>⇧⏎</kbd> previous.
+            </p>
+            <ul class="strip__bullets" data-motion-child>
+              <li>Fuzzy &amp; literal modes</li>
+              <li>Highlights persist on cursor move</li>
+            </ul>
+          </div>
+          <figure class="strip__visual" data-motion-child>
+            <div class="snap snap--search">
+              <header class="snap__bar">
+                <span class="snap__lights"><span></span><span></span><span></span></span>
+                <span class="snap__title">PREVIEW · search</span>
+              </header>
+              <div class="snap__body">
+                <div class="snap__search">
+                  <span class="snap__search-pill">SEARCH</span>
+                  <span class="snap__search-input">auth<span class="snap__search-cursor">▍</span></span>
+                  <span class="snap__search-count">3 / 14</span>
+                </div>
+                <div class="snap__msg snap__msg--u">
+                  <span class="snap__msg-role">👨 user</span> <span class="snap__msg-time">2m ago · 14:32</span>
+                </div>
+                <div class="snap__msg-body">can we move JWT validation off the hot path? the <mark class="is-current">auth</mark> check is showing up in flame graphs.</div>
+                <div class="snap__msg snap__msg--a">
+                  <span class="snap__msg-role">🤖 assistant</span> <span class="snap__msg-time">1m · 14:33</span>
+                </div>
+                <div class="snap__msg-body">three options. The hottest call is <code>jwt.verify()</code>. We can cache, switch alg, or move <mark>auth</mark> to an edge worker.</div>
+              </div>
+            </div>
+          </figure>
+        </div>
+      </article>
+
+      <!-- Strip 3 — Moss wash · Resume -->
+      <article class="strip strip--moss" data-motion="manuscript-rise">
+        <div class="strip__bg" aria-hidden="true"></div>
+        <div class="strip__inner">
+          <div class="strip__text">
+            <p class="strip__no" data-motion-child>03</p>
+            <h2 class="strip__title" data-motion-child>
+              Pick up <em>where you left off.</em>
+            </h2>
+            <p class="strip__body" data-motion-child>
+              Cursor on any message, press <kbd>⏎</kbd> twice. openctx writes a
+              fresh JSONL truncated at the cut, then runs <code>claude --resume</code>
+              (or <code>codex resume</code>) with your edit pre-filled via PTY
+              bracketed paste.
+            </p>
+            <ul class="strip__bullets" data-motion-child>
+              <li>Same terminal, or a new window (macOS)</li>
+              <li>Works with Node <em>and</em> Bun via runtime PTY split</li>
+            </ul>
+          </div>
+          <figure class="strip__visual" data-motion-child>
+            <div class="snap snap--resume">
+              <header class="snap__bar">
+                <span class="snap__lights"><span></span><span></span><span></span></span>
+                <span class="snap__title">PREVIEW · resume</span>
+              </header>
+              <div class="snap__body">
+                <div class="snap__msg snap__msg--u">
+                  <span class="snap__msg-role">👨 user</span> <span class="snap__msg-time">3h ago · 11:08</span>
+                </div>
+                <div class="snap__msg-body">the preview pane flickers when I hold ↓.</div>
+                <div class="snap__msg snap__msg--a">
+                  <span class="snap__msg-role">🤖 assistant</span> <span class="snap__msg-time">3h · 11:09</span>
+                </div>
+                <div class="snap__msg-body">memoize <code>renderMarkdown(session)</code> by session id, debounce the scroll-anchor recompute.</div>
+                <div class="snap__resume">
+                  <span class="snap__resume-arrow">↪</span>
+                  <span class="snap__resume-label">Continue conversation</span>
+                  <span class="snap__resume-chip">[Claude]</span>
+                </div>
+              </div>
+            </div>
+          </figure>
+        </div>
+      </article>
+    </section>
+
+    <!-- ──────── FAQ · rolodex · sticky question column ──────── -->
+    <section class="faq" id="faq" data-section="faq" data-label="FAQ">
+      <header class="faq__head" data-reveal>
+        <p class="faq__eyebrow">02 / Honest answers</p>
+      </header>
+      <div class="faq__list">
+        <details open data-reveal>
+          <summary>
+            <span class="faq__q">Is anything sent off my machine?</span>
+            <span class="faq__chev" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq__a">
+            <p>No. openctx is a local-only TUI. It reads the JSONL files Claude Code and Codex CLI already wrote to <code>~/.claude/projects/</code> and <code>~/.codex/sessions/</code>. Nothing is uploaded, indexed remotely, or phoned home.</p>
+          </div>
+        </details>
+        <details data-reveal>
+          <summary>
+            <span class="faq__q">How does <em>continue conversation</em> work?</span>
+            <span class="faq__chev" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq__a">
+            <p>For Claude Code, openctx writes a fresh JSONL beside the original (new UUID, same project) containing the entries up to your cut point, then runs <code>claude --resume &lt;new-uuid&gt;</code>. If the cut is a user message, that text is pre-filled into Claude's input via PTY bracketed paste. For Codex, <code>codex resume &lt;session-id&gt;</code> picks the transcript up whole.</p>
+          </div>
+        </details>
+        <details data-reveal>
+          <summary>
+            <span class="faq__q">Bun or Node — which do I install under?</span>
+            <span class="faq__chev" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq__a">
+            <p>Either. Under Bun, the optional <code>bun-pty</code> is picked up automatically for the resume PTY. Under Node ≥ 20, <code>@lydell/node-pty</code> is used. The runtime is detected at launch — you don't pick.</p>
+          </div>
+        </details>
+        <details data-reveal>
+          <summary>
+            <span class="faq__q">How do I uninstall?</span>
+            <span class="faq__chev" aria-hidden="true">+</span>
+          </summary>
+          <div class="faq__a">
+            <p><code>npm uninstall -g @12og3r/openctx</code> (or the equivalent for bun / pnpm / yarn). Settings live at <code>~/.openctx/settings.json</code>; remove it if you want a clean slate.</p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- copy toast (used by the hero install button) -->
+    <div class="copy-toast" id="copy-toast" role="status" aria-live="polite">
+      <span class="copy-toast__icon">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 12.5l5 5L20 6.5"/>
+        </svg>
+      </span>
+      <span class="copy-toast__text">copied</span>
+    </div>
+  </main>
+
+  <!-- ─────────────────── FOOTER · one-liner ─────────────────── -->
+  <footer class="foot">
+    <span class="foot__brand">openctx</span>
+    <span class="foot__sep">·</span>
+    <a href="https://www.npmjs.com/package/@12og3r/openctx" target="_blank" rel="noopener">npm</a>
+    <span class="foot__sep">·</span>
+    <a href="https://github.com/12og3r/open-context-cli" target="_blank" rel="noopener">github</a>
+    <span class="foot__sep">·</span>
+    <a href="https://github.com/12og3r/open-context-cli/issues" target="_blank" rel="noopener">issues</a>
+    <span class="foot__sep">·</span>
+    <span>GPL-3.0</span>
+    <span class="foot__sep">·</span>
+    <span>© <span id="year">2026</span></span>
+  </footer>
+
+  <script src="script.js" defer></script>
+</body>
+</html>
