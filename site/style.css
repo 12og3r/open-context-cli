@@ -1272,7 +1272,7 @@ em {
 }
 .faq summary::-webkit-details-marker { display: none; }
 .faq summary:hover { color: var(--signal); }
-.faq__q em { font-style: italic; }
+.faq__q em { font-style: italic; color: inherit; }
 .faq__chev {
   font: 400 28px/1 var(--f-serif);
   color: var(--ember);
