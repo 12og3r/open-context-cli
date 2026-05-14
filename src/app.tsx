@@ -23,6 +23,7 @@ import {
 } from "./lib/session-status.ts";
 import { claudeProjectsDir } from "./lib/claude-paths.ts";
 import { codexSessionsDir } from "./lib/codex-paths.ts";
+import { geminiTmpDir } from "./lib/gemini-paths.ts";
 
 type Roots = Record<Source, string>;
 type Enabled = Record<Source, boolean>;
@@ -57,7 +58,8 @@ export function App({
   const roots: Roots = useMemo(() => ({
     "claude-code": expandHome(settings.sessionsDir || claudeProjectsDir()),
     "codex": expandHome(settings.codexSessionsDir || codexSessionsDir()),
-  }), [settings.sessionsDir, settings.codexSessionsDir]);
+    "gemini": expandHome(settings.geminiSessionsDir || geminiTmpDir()),
+  }), [settings.sessionsDir, settings.codexSessionsDir, settings.geminiSessionsDir]);
 
   const [state, setState] = useState<AppState>(() => ({
     kind: "scanning", roots, enabled,
@@ -130,6 +132,7 @@ export function App({
         updateSetting={updateSetting}
         defaultClaudeDir={claudeProjectsDir()}
         defaultCodexDir={codexSessionsDir()}
+        defaultGeminiDir={geminiTmpDir()}
         onQuit={() => exit()}
         onSessionRemoved={(id) => {
           setState(prev => {

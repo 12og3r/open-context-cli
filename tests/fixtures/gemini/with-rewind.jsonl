@@ -1,0 +1,8 @@
+{"sessionId":"019e10b0-3333-4000-8000-aaa000000003","projectHash":"deadbeef","startTime":"2026-05-10T09:00:00.000Z","lastUpdated":"2026-05-10T09:05:00.000Z","kind":"chat"}
+{"id":"msg-u1","timestamp":"2026-05-10T09:00:01.000Z","type":"user","content":"first question"}
+{"id":"msg-g1","timestamp":"2026-05-10T09:00:02.000Z","type":"gemini","content":"first answer"}
+{"id":"msg-u2","timestamp":"2026-05-10T09:00:03.000Z","type":"user","content":"second question (will be rewound)"}
+{"id":"msg-g2","timestamp":"2026-05-10T09:00:04.000Z","type":"gemini","content":"second answer (will be rewound)"}
+{"$rewindTo":"msg-u2"}
+{"id":"msg-u3","timestamp":"2026-05-10T09:00:05.000Z","type":"user","content":"replacement question"}
+{"id":"msg-g3","timestamp":"2026-05-10T09:00:06.000Z","type":"gemini","content":"replacement answer"}

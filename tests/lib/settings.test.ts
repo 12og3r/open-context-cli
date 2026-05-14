@@ -19,20 +19,23 @@ describe("settings continueLaunchMode", () => {
 });
 
 describe("settings codex/source fields", () => {
-  test("codex defaults: dir empty, both sources visible", () => {
+  test("codex defaults: dir empty, all sources visible", () => {
     expect(DEFAULT_SETTINGS.codexSessionsDir).toBe("");
+    expect(DEFAULT_SETTINGS.geminiSessionsDir).toBe("");
     expect(DEFAULT_SETTINGS.showClaudeCode).toBe(true);
     expect(DEFAULT_SETTINGS.showCodex).toBe(true);
+    expect(DEFAULT_SETTINGS.showGemini).toBe(true);
   });
 
   test("enabledSourcesFromSettings reflects show* booleans", () => {
     const all = enabledSourcesFromSettings(DEFAULT_SETTINGS);
-    expect(all).toEqual({ "claude-code": true, "codex": true });
+    expect(all).toEqual({ "claude-code": true, "codex": true, "gemini": true });
 
     const onlyCodex = enabledSourcesFromSettings({
       ...DEFAULT_SETTINGS,
       showClaudeCode: false,
+      showGemini: false,
     });
-    expect(onlyCodex).toEqual({ "claude-code": false, "codex": true });
+    expect(onlyCodex).toEqual({ "claude-code": false, "codex": true, "gemini": false });
   });
 });

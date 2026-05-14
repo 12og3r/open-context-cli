@@ -15,11 +15,12 @@ const OK = "green";
 
 // Setting keys that are edited via the path-input UX (text box + restore
 // default button). Anything else is rendered as an options field.
-type PathSettingsKey = "sessionsDir" | "codexSessionsDir";
-type ShowSourceKey = "showClaudeCode" | "showCodex";
+type PathSettingsKey = "sessionsDir" | "codexSessionsDir" | "geminiSessionsDir";
+type ShowSourceKey = "showClaudeCode" | "showCodex" | "showGemini";
 const PATH_SETTING_KEYS: readonly PathSettingsKey[] = [
   "sessionsDir",
   "codexSessionsDir",
+  "geminiSessionsDir",
 ] as const;
 
 type OptionsKeys = Exclude<keyof Settings, PathSettingsKey | ShowSourceKey>;
@@ -48,6 +49,7 @@ function buildFields(
   lang: Lang,
   defaultClaudeDir: string,
   defaultCodexDir: string,
+  defaultGeminiDir: string,
 ): FieldDef[] {
   return [
     {
@@ -69,6 +71,17 @@ function buildFields(
       title: t(lang, "settings.codex_sessions_dir.title"),
       defaultLabel: t(lang, "settings.sessions_dir.default_label", {
         path: defaultCodexDir || "—",
+      }),
+      restoreLabel: t(lang, "settings.sessions_dir.restore"),
+    },
+    {
+      kind: "source",
+      source: "gemini",
+      pathKey: "geminiSessionsDir",
+      toggleKey: "showGemini",
+      title: t(lang, "settings.gemini_sessions_dir.title"),
+      defaultLabel: t(lang, "settings.sessions_dir.default_label", {
+        path: defaultGeminiDir || "—",
       }),
       restoreLabel: t(lang, "settings.sessions_dir.restore"),
     },
@@ -158,6 +171,7 @@ export function SettingsPanel({
   height,
   defaultClaudeDir,
   defaultCodexDir,
+  defaultGeminiDir,
   sessionStatusBySource,
 }: {
   settings: Settings;
@@ -167,12 +181,13 @@ export function SettingsPanel({
   height: number;
   defaultClaudeDir: string;
   defaultCodexDir: string;
+  defaultGeminiDir: string;
   sessionStatusBySource: SessionStatusBySource;
 }) {
   const lang = useLang();
   const FIELDS = useMemo(
-    () => buildFields(lang, defaultClaudeDir, defaultCodexDir),
-    [lang, defaultClaudeDir, defaultCodexDir],
+    () => buildFields(lang, defaultClaudeDir, defaultCodexDir, defaultGeminiDir),
+    [lang, defaultClaudeDir, defaultCodexDir, defaultGeminiDir],
   );
   const [fieldIdx, setFieldIdx] = useState(0);
   // Per-field "option cursor" — independent of the applied value. Initialized
@@ -193,6 +208,7 @@ export function SettingsPanel({
   const [pathDrafts, setPathDrafts] = useState<PathDrafts>(() => ({
     sessionsDir: settings.sessionsDir,
     codexSessionsDir: settings.codexSessionsDir,
+    geminiSessionsDir: settings.geminiSessionsDir,
   }));
   const pathDraftsRef = useRef(pathDrafts);
   useEffect(() => {
@@ -209,6 +225,7 @@ export function SettingsPanel({
       setPathDrafts({
         sessionsDir: settings.sessionsDir,
         codexSessionsDir: settings.codexSessionsDir,
+        geminiSessionsDir: settings.geminiSessionsDir,
       });
       setSourceSubCursor("input");
     }

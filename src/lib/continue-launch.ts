@@ -3,6 +3,7 @@ import process from "node:process";
 import type { ContinueRequest } from "./continue-types.ts";
 import { executeContinueClaude } from "./continue-launch-claude.ts";
 import { executeContinueCodex } from "./continue-launch-codex.ts";
+import { executeContinueGemini } from "./continue-launch-gemini.ts";
 import { trace } from "./debug-trace.ts";
 
 export interface ContinueResult {
@@ -22,13 +23,17 @@ export interface ContinueResult {
 export async function executeContinue(req: ContinueRequest): Promise<ContinueResult> {
   trace("launch", `dispatch source=${req.source} mode=${req.launchMode}`);
 
-  const cliBinary = req.source === "codex" ? "codex" : "claude";
+  const cliBinary =
+    req.source === "codex" ? "codex"
+    : req.source === "gemini" ? "gemini"
+    : "claude";
   if (!hasOnPath(cliBinary)) {
     trace("launch", `preflight FAIL: ${cliBinary} not on PATH`);
     return { ok: false, error: `${cliBinary} not found in PATH` };
   }
 
   if (req.source === "codex") return executeContinueCodex(req);
+  if (req.source === "gemini") return executeContinueGemini(req);
   return executeContinueClaude(req);
 }
 

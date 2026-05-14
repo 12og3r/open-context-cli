@@ -7,18 +7,19 @@ import { t, type Lang } from "../lib/i18n.ts";
 import { useLang } from "../hooks/use-lang.ts";
 
 export function sourceChipLabel(source: Source, lang: Lang): string {
-  return source === "codex"
-    ? t(lang, "source.codex")
-    : t(lang, "source.claude_code");
+  if (source === "codex") return t(lang, "source.codex");
+  if (source === "gemini") return t(lang, "source.gemini");
+  return t(lang, "source.claude_code");
 }
 
 // Source label rendered in front of the metadata subtitle:
-// "[Claude]" / "[Codex]". The text comes from the i18n table so it
-// stays in sync with the preview chip; the color reinforces the same
-// signal at a glance.
+// "[Claude]" / "[Codex]" / "[Gemini]". The text comes from the i18n table
+// so it stays in sync with the preview chip; the color reinforces the
+// same signal at a glance.
 const SOURCE_COLOR: Record<Source, string> = {
   "claude-code": "cyan",
   "codex":       "magenta",
+  "gemini":      "yellow",
 };
 const SELECTION_BAR = "▌";
 

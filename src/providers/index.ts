@@ -1,13 +1,15 @@
 // src/providers/index.ts
 import { ClaudeCodeProvider } from "./claude-code.ts";
 import { CodexProvider } from "./codex.ts";
+import { GeminiProvider } from "./gemini.ts";
 import type { SessionMeta, SessionProvider, Source } from "./types.ts";
 
-export const ALL_SOURCES: readonly Source[] = ["claude-code", "codex"] as const;
+export const ALL_SOURCES: readonly Source[] = ["claude-code", "codex", "gemini"] as const;
 
 const providers: Record<Source, SessionProvider> = {
   "claude-code": new ClaudeCodeProvider(),
   "codex":       new CodexProvider(),
+  "gemini":      new GeminiProvider(),
 };
 
 // Kept for the (rare) caller that still wants the canonical default.

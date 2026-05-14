@@ -1,0 +1,4 @@
+{"sessionId":"019e10b0-1111-4000-8000-aaa000000001","projectHash":"deadbeef","startTime":"2026-05-10T07:00:00.000Z","lastUpdated":"2026-05-10T07:01:00.000Z","kind":"chat"}
+{"id":"msg-u1","timestamp":"2026-05-10T07:00:01.000Z","type":"user","content":"hello there gemini"}
+{"id":"msg-g1","timestamp":"2026-05-10T07:00:02.000Z","type":"gemini","content":[{"text":"Hi there. What's the task?"}],"model":"gemini-2.0-pro"}
+{"$set":{"summary":"intro chat"}}

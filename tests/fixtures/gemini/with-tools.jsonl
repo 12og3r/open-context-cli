@@ -1,0 +1,3 @@
+{"sessionId":"019e10b0-2222-4000-8000-aaa000000002","projectHash":"deadbeef","startTime":"2026-05-10T08:00:00.000Z","lastUpdated":"2026-05-10T08:01:00.000Z","kind":"chat"}
+{"id":"msg-u1","timestamp":"2026-05-10T08:00:01.000Z","type":"user","content":[{"text":"please list the files"}]}
+{"id":"msg-g1","timestamp":"2026-05-10T08:00:02.000Z","type":"gemini","content":"running ls","toolCalls":[{"id":"call-1","name":"run_shell_command","displayName":"Shell","args":{"command":"ls -la"},"status":"success","resultDisplay":"total 0\nfile1\nfile2"}],"model":"gemini-2.0-pro"}

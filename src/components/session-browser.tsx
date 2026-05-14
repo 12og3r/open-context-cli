@@ -36,6 +36,7 @@ export function SessionBrowser({
   updateSetting,
   defaultClaudeDir,
   defaultCodexDir,
+  defaultGeminiDir,
   onQuit,
   onSessionRemoved,
   onRequestContinue,
@@ -47,6 +48,7 @@ export function SessionBrowser({
   updateSetting: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   defaultClaudeDir: string;
   defaultCodexDir: string;
+  defaultGeminiDir: string;
   onQuit: () => void;
   onSessionRemoved?: (id: string) => void;
   onRequestContinue?: (req: ContinueRequest) => void;
@@ -306,6 +308,7 @@ export function SessionBrowser({
               height={innerHeight}
               defaultClaudeDir={defaultClaudeDir}
               defaultCodexDir={defaultCodexDir}
+              defaultGeminiDir={defaultGeminiDir}
               sessionStatusBySource={sessionStatusBySource}
             />
           ) : rightView === "delete-confirm" && deleteTarget ? (
@@ -350,13 +353,15 @@ export function SessionBrowser({
                     }
 
                     const isCodex = selected.source === "codex";
+                    const isGemini = selected.source === "gemini";
+                    const isClaude = !isCodex && !isGemini;
 
-                    // Codex sessions store cwd directly in session_meta;
-                    // claude sessions either record it on each entry or we
-                    // decode it from the slug (lossy when a path segment
-                    // contains "-").
+                    // Codex and Gemini sessions record cwd directly in
+                    // their session metadata; claude sessions either
+                    // record it on each entry or we decode it from the
+                    // slug (lossy when a path segment contains "-").
                     let sessionCwd: string | undefined;
-                    if (isCodex) {
+                    if (isCodex || isGemini) {
                       sessionCwd = selected.cwd;
                     } else {
                       const slug = path.basename(path.dirname(selected.filePath));
@@ -365,10 +370,11 @@ export function SessionBrowser({
 
                     // Project directory missing: recoverable for claude
                     // (we re-anchor the forked JSONL to process.cwd()).
-                    // For codex we just let `codex resume` start in
-                    // process.cwd() — no fork, no rewrite, no force prompt.
+                    // For codex and gemini we just let the CLI start in
+                    // process.cwd() — no rewrite, no force prompt. The
+                    // gemini fork sits next to the source file regardless.
                     let forceCwd: string | undefined;
-                    if (!isCodex && sessionCwd && !fsSync.existsSync(sessionCwd)) {
+                    if (isClaude && sessionCwd && !fsSync.existsSync(sessionCwd)) {
                       if (!info.force) {
                         return {
                           ok: false,
@@ -379,19 +385,20 @@ export function SessionBrowser({
                       forceCwd = process.cwd();
                     }
 
-                    const cliBinary = isCodex ? "codex" : "claude";
+                    const cliBinary = isCodex ? "codex" : isGemini ? "gemini" : "claude";
                     const probe = spawnSync(
                       process.platform === "win32" ? "where" : "which",
                       [cliBinary],
                       { stdio: "ignore" },
                     );
                     if (probe.status !== 0) {
+                      const errKey =
+                        isCodex ? "continue.error_no_codex"
+                        : isGemini ? "continue.error_no_gemini"
+                        : "continue.error_no_claude";
                       return {
                         ok: false,
-                        error: t(
-                          lang,
-                          isCodex ? "continue.error_no_codex" : "continue.error_no_claude",
-                        ),
+                        error: t(lang, errKey),
                       };
                     }
 

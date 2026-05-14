@@ -20,11 +20,15 @@ export interface Settings {
   // Codex CLI sessions root. Same empty-string-means-default semantics as
   // sessionsDir; the default resolves to `${CODEX_HOME ?? ~/.codex}/sessions`.
   codexSessionsDir: string;
+  // Gemini CLI per-project sessions root. Same empty-string-means-default
+  // semantics; the default resolves to `${GEMINI_CLI_HOME ?? ~}/.gemini/tmp`.
+  geminiSessionsDir: string;
   // Per-source visibility. When a source is disabled, its sessions are
-  // skipped during aggregation. Both default true — disabling a source is
+  // skipped during aggregation. All default true — disabling a source is
   // a deliberate user choice.
   showClaudeCode: boolean;
   showCodex: boolean;
+  showGemini: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -34,8 +38,10 @@ export const DEFAULT_SETTINGS: Settings = {
   continueLaunchMode: "reuse-current",
   sessionsDir: "",
   codexSessionsDir: "",
+  geminiSessionsDir: "",
   showClaudeCode: true,
   showCodex: true,
+  showGemini: true,
 };
 
 /**
@@ -46,6 +52,7 @@ export function enabledSourcesFromSettings(s: Settings): Record<Source, boolean>
   return {
     "claude-code": s.showClaudeCode,
     "codex":       s.showCodex,
+    "gemini":      s.showGemini,
   };
 }
 
@@ -101,11 +108,17 @@ function sanitize(p: Partial<Settings>): Partial<Settings> {
   if (typeof p.codexSessionsDir === "string") {
     out.codexSessionsDir = p.codexSessionsDir;
   }
+  if (typeof p.geminiSessionsDir === "string") {
+    out.geminiSessionsDir = p.geminiSessionsDir;
+  }
   if (typeof p.showClaudeCode === "boolean") {
     out.showClaudeCode = p.showClaudeCode;
   }
   if (typeof p.showCodex === "boolean") {
     out.showCodex = p.showCodex;
+  }
+  if (typeof p.showGemini === "boolean") {
+    out.showGemini = p.showGemini;
   }
   return out;
 }

@@ -1,0 +1,5 @@
+{"sessionId":"019e10b0-5555-4000-8000-aaa000000005","projectHash":"deadbeef","startTime":"2026-05-10T11:00:00.000Z","lastUpdated":"2026-05-10T11:00:01.000Z","kind":"chat"}
+this is not json
+{"id":"msg-u1","timestamp":"2026-05-10T11:00:01.000Z","type":"user","content":"survives malformed lines"}
+{ bad json
+{"id":"msg-g1","timestamp":"2026-05-10T11:00:02.000Z","type":"gemini","content":"ok"}

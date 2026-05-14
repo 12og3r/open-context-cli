@@ -1,0 +1,3 @@
+{"sessionId":"019e10b0-6666-4000-8000-aaa000000006","projectHash":"deadbeef","startTime":"2026-05-10T12:00:00.000Z","lastUpdated":"2026-05-10T12:00:01.000Z","kind":"subagent"}
+{"id":"msg-u1","timestamp":"2026-05-10T12:00:01.000Z","type":"user","content":"do a subtask"}
+{"id":"msg-g1","timestamp":"2026-05-10T12:00:02.000Z","type":"gemini","content":"done"}

@@ -1,6 +1,6 @@
 // src/providers/types.ts
 
-export type Source = "claude-code" | "codex";
+export type Source = "claude-code" | "codex" | "gemini";
 
 export type Role = "user" | "assistant" | "tool_use" | "tool_result" | "system";
 

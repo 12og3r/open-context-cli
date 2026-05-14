@@ -18,7 +18,7 @@ function parseArgs(argv: string[]): { emoji: boolean } {
 }
 
 function printHelp() {
-  process.stdout.write(`openctx ${pkg.version} — browse local Claude Code and Codex session history
+  process.stdout.write(`openctx ${pkg.version} — browse local Claude Code, Codex, and Gemini session history
 
 Usage:
   openctx [--no-emoji]

@@ -11,6 +11,7 @@ const PROPS = {
   height: 30,
   defaultClaudeDir: "/home/u/.claude/projects",
   defaultCodexDir: "/home/u/.codex/sessions",
+  defaultGeminiDir: "/home/u/.gemini/tmp",
 };
 
 describe("SettingsPanel source rows", () => {
@@ -19,7 +20,7 @@ describe("SettingsPanel source rows", () => {
       <SettingsPanel
         {...PROPS}
         settings={DEFAULT_SETTINGS}
-        sessionStatusBySource={{ "claude-code": "ok", "codex": "missing" }}
+        sessionStatusBySource={{ "claude-code": "ok", "codex": "missing", "gemini": "missing" }}
       />,
     );
     const out = lastFrame() ?? "";
@@ -35,12 +36,37 @@ describe("SettingsPanel source rows", () => {
     expect(lines[claudeDefaultIdx - 1]!).toContain("Sessions found");
   });
 
+  test("Gemini row shows status badge above the default-path line", () => {
+    const { lastFrame } = render(
+      <SettingsPanel
+        {...PROPS}
+        settings={DEFAULT_SETTINGS}
+        sessionStatusBySource={{ "claude-code": "ok", "codex": "ok", "gemini": "ok" }}
+      />,
+    );
+    const out = lastFrame() ?? "";
+    const lines = out.split("\n");
+    const geminiDefaultIdx = lines.findIndex(l =>
+      l.includes("Default: /home/u/.gemini/tmp"),
+    );
+    expect(geminiDefaultIdx).toBeGreaterThanOrEqual(1);
+    // Title row carries the badge; finding the row a few above the
+    // default-path line keeps the check robust against the toggle row
+    // landing between the title and the path input.
+    const titleIdx = lines.findIndex(l => l.includes("Gemini path"));
+    expect(titleIdx).toBeGreaterThanOrEqual(0);
+    expect(titleIdx).toBeLessThan(geminiDefaultIdx);
+    expect(lines[titleIdx]!).toContain("Sessions found");
+    expect(lines[titleIdx]!).toContain("On");
+    expect(lines[titleIdx]!).toContain("Off");
+  });
+
   test("Codex row shows red badge when status is missing", () => {
     const { lastFrame } = render(
       <SettingsPanel
         {...PROPS}
         settings={DEFAULT_SETTINGS}
-        sessionStatusBySource={{ "claude-code": "ok", "codex": "missing" }}
+        sessionStatusBySource={{ "claude-code": "ok", "codex": "missing", "gemini": "missing" }}
       />,
     );
     const out = lastFrame() ?? "";
@@ -57,7 +83,7 @@ describe("SettingsPanel source rows", () => {
       <SettingsPanel
         {...PROPS}
         settings={{ ...DEFAULT_SETTINGS, showCodex: false }}
-        sessionStatusBySource={{ "claude-code": "ok", "codex": "hidden" }}
+        sessionStatusBySource={{ "claude-code": "ok", "codex": "hidden", "gemini": "ok" }}
       />,
     );
     const out = lastFrame() ?? "";
@@ -69,7 +95,7 @@ describe("SettingsPanel source rows", () => {
       <SettingsPanel
         {...PROPS}
         settings={DEFAULT_SETTINGS}
-        sessionStatusBySource={{ "claude-code": "ok", "codex": "ok" }}
+        sessionStatusBySource={{ "claude-code": "ok", "codex": "ok", "gemini": "ok" }}
       />,
     );
     const out = lastFrame() ?? "";
@@ -89,7 +115,7 @@ describe("SettingsPanel source rows", () => {
       <SettingsPanel
         {...PROPS}
         settings={DEFAULT_SETTINGS}
-        sessionStatusBySource={{ "claude-code": "ok", "codex": "ok" }}
+        sessionStatusBySource={{ "claude-code": "ok", "codex": "ok", "gemini": "ok" }}
       />,
     );
     const out = lastFrame() ?? "";
@@ -110,7 +136,7 @@ describe("SettingsPanel source rows", () => {
         height={28}
         focused
         settings={DEFAULT_SETTINGS}
-        sessionStatusBySource={{ "claude-code": "missing", "codex": "missing" }}
+        sessionStatusBySource={{ "claude-code": "missing", "codex": "missing", "gemini": "missing" }}
       />,
     );
     await tick();
@@ -134,7 +160,7 @@ describe("SettingsPanel source rows", () => {
         {...PROPS}
         focused
         settings={DEFAULT_SETTINGS}
-        sessionStatusBySource={{ "claude-code": "missing", "codex": "missing" }}
+        sessionStatusBySource={{ "claude-code": "missing", "codex": "missing", "gemini": "missing" }}
       />,
     );
     await tick();
@@ -159,7 +185,7 @@ describe("SettingsPanel source rows", () => {
         {...PROPS}
         focused
         settings={DEFAULT_SETTINGS}
-        sessionStatusBySource={{ "claude-code": "missing", "codex": "missing" }}
+        sessionStatusBySource={{ "claude-code": "missing", "codex": "missing", "gemini": "missing" }}
       />,
     );
     await tick();
