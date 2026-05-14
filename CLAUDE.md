@@ -112,7 +112,11 @@ node dist/cli.js --version    # prints the version string
 
 ```bash
 bun install
-bun run dev          # run the TUI from source
+bun run dev          # build with bun + run under node — matches the
+                     # published-binary experience (snappy)
+bun run dev:bun      # run source directly under Bun runtime; slower
+                     # because Bun's stdin/stdout pipeline adds latency
+                     # to Ink TUIs vs Node
 bun test             # 115 tests, fast
 bun run typecheck    # tsc --noEmit
 bun run build        # bundles to dist/cli.js
@@ -121,6 +125,17 @@ bun run build        # bundles to dist/cli.js
 `dist/` is gitignored — the published bundle is built fresh by the
 `prepublishOnly` hook (`bun run build && chmod +x dist/cli.js`) during
 `npm publish`. Don't commit `dist/`.
+
+### Why `dev` builds and runs under Node
+
+`openctx` is installed as `bin: { "openctx": "dist/cli.js" }` and most
+users invoke it under Node after `npm install -g`. Running the source
+directly under Bun (`bun run src/cli.tsx`) feels noticeably laggy on
+keystrokes — Bun's process-stdin event delivery and TTY raw-mode
+handling add latency that Ink amplifies on every render. Building
+first with `bun build` then handing off to Node gives a dev iteration
+that matches what users actually see post-install. The build step is
+~10ms so the round-trip is unchanged in practice.
 
 ## Settings file location
 

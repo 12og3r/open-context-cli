@@ -34,7 +34,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "bun run src/cli.tsx",
+    "dev": "bun run build && node dist/cli.js",
+    "dev:bun": "NODE_ENV=production bun run src/cli.tsx",
     "build": "bun build src/cli.tsx --outdir dist --target node --format esm --packages external",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
