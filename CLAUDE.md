@@ -17,16 +17,37 @@ and finally creates a GitHub Release with auto-generated notes.
 git status
 git pull --ff-only
 
-# 2. Bump the version. This edits package.json, commits, and tags.
+# 2. Update the version label on the landing site so the promo page
+#    matches what npm will publish. Commit this with the feature work
+#    (or as its own commit) BEFORE running `npm version`, because
+#    `npm version` refuses to run on a dirty tree and tags the HEAD
+#    commit as the release.
+#    File: site/index.html → <span class="brand__v">v0.x.y</span>
+
+# 3. Bump the version. This edits package.json, commits, and tags.
 npm version patch       # or minor / major
 # → creates commit "0.x.y" + tag "v0.x.y"
 
-# 3. Push the commit AND the tag together.
+# 4. Push the commit AND the tag together.
 git push --follow-tags
 ```
 
 That's it — the workflow takes over from here. Watch progress at
 <https://github.com/12og3r/open-context-cli/actions>.
+
+### Updating the promotion page on release
+
+The landing site at `site/index.html` carries a visible version chip
+next to the brand wordmark (`<span class="brand__v" id="brand-v">`).
+Bump it to the new `vX.Y.Z` **as part of the same feature commit, or
+in a dedicated site commit, but always BEFORE `npm version`** — the
+version-bump commit should only touch `package.json` so the tag
+points cleanly at the version change.
+
+If the release adds or meaningfully changes a user-visible feature,
+also update the matching strip (`#features` section) or FAQ entry so
+the page doesn't advertise stale behavior. Bug-fix-only releases
+don't need copy changes — just the version chip.
 
 ### What `npm version patch` actually does
 

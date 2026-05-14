@@ -204,8 +204,14 @@ em {
   position: relative;
   opacity: 0;
   will-change: transform, opacity, filter;
+  /* Italic Fraunces letters (p, c, t, x) overhang the advance-width box on
+     the right via the slant, and 'p' also drops a descender. Without this
+     padding the GPU layer allocated during filter:blur clips the italic ink. */
+  padding: 0.04em 0.14em 0.08em;
+  overflow: visible;
 }
 .boot__glyph--period { color: var(--signal); }
+.boot__glyph--ctx { color: var(--ember); }
 
 .boot__rain {
   position: absolute;
@@ -313,6 +319,7 @@ em {
 
 .brand { display: inline-flex; align-items: baseline; gap: 8px; }
 .brand__name { font: 500 18px/1 var(--f-sans); color: var(--ink); letter-spacing: -0.02em; }
+.brand__name-ctx { color: var(--ember); }
 .brand__v {
   font: 400 11px/1 var(--f-mono);
   color: var(--ink-4);
@@ -478,6 +485,13 @@ em {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+/* Inner span needs to override both `color` (cascades into inner span as
+   transparent) AND `-webkit-text-fill-color` (otherwise webkit keeps showing
+   the outer's background-clipped fill through the nested text). */
+.hero__wordmark-ctx {
+  color: var(--ember);
+  -webkit-text-fill-color: var(--ember);
 }
 .hero__tagline {
   font: 500 clamp(38px, 5.6vw, 76px)/1 var(--f-serif);
@@ -656,7 +670,13 @@ em {
 .pane[data-focused="true"] .pane__title-text { color: var(--t-cyan); }
 .pane__title-text { color: var(--t-fg-dim); font-weight: 600; }
 .pane__title-meta { color: var(--t-fg-faint); font-weight: 400; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 24ch; }
-.pane__body { flex: 1; padding-top: 8px; overflow: hidden; min-width: 0; }
+.pane__body { flex: 1; padding-top: 8px; overflow: hidden; min-width: 0; min-height: 0; }
+/* Session list scrolls internally so the autopilot's scrollIntoView
+   on the active row stays inside the list — otherwise the browser
+   walks up to <body> and scrolls the whole page each time the active
+   session changes, which reads as the preview "jumping". */
+.pane--list .pane__body { overflow-y: auto; scrollbar-width: none; }
+.pane--list .pane__body::-webkit-scrollbar { display: none; }
 
 .session-list { display: flex; flex-direction: column; gap: 12px; }
 .session { cursor: pointer; font-size: 13px; line-height: 1.4; min-width: 0; }
@@ -708,22 +728,30 @@ em {
 
 /* search-match highlights — matched items get an underline; the currently-
    focused match is red. Used both by the live auto-pilot search and by the
-   static .snap__msg-body in the features section. */
+   static .snap__msg-body in the features section.
+   NB: declare longhand props only — mixing `text-decoration: underline`
+   shorthand with `text-decoration-color` / `-thickness` longhand in the same
+   rule causes the longhand values to be ignored on iOS Safari. */
 .msg__body mark,
 .snap__msg-body mark {
   background: transparent;
   color: inherit;
   padding: 0;
   border-radius: 0;
-  text-decoration: underline;
+  text-decoration-line: underline;
+  text-decoration-style: solid;
   text-decoration-color: var(--t-fg-dim);
-  text-decoration-thickness: 1px;
+  -webkit-text-decoration-line: underline;
+  -webkit-text-decoration-style: solid;
+  -webkit-text-decoration-color: var(--t-fg-dim);
+  text-decoration-thickness: 1.5px;
   text-underline-offset: 3px;
 }
 .msg__body mark.is-current,
 .snap__msg-body mark.is-current {
   color: #FF5F4D;
   text-decoration-color: #FF5F4D;
+  -webkit-text-decoration-color: #FF5F4D;
   font-weight: 500;
 }
 
@@ -1425,8 +1453,12 @@ em {
   .closer__title { font-size: clamp(54px, 16vw, 120px); margin-bottom: 36px; }
 
   /* TUI on tablet */
-  .tui__panes { grid-template-columns: 240px 1fr; gap: 12px; min-height: 360px; }
+  /* Hard-pin both pane heights (not min-/max-) so the autopilot
+     session switches and search/continue overlays can't change the
+     grid row height — that's what bounces the page below. */
+  .tui__panes { grid-template-columns: 240px 1fr; gap: 12px; }
   .pane { padding: 14px 12px 10px; }
+  .pane--list, .pane--preview { height: 360px; }
   .pane__featurebar { margin: 12px -12px -10px; padding: 8px 12px; }
 }
 
@@ -1446,10 +1478,9 @@ em {
   .hero__tagline { font-size: clamp(28px, 11vw, 44px); margin-bottom: 16px; }
   .hero__sub { font-size: 14.5px; margin-bottom: 24px; }
   .hero__copy { margin-bottom: 20px; }
-  /* install pill on phone: tighter, scope hidden, allow wrap */
+  /* install pill on phone: tighter, allow wrap */
   .install { padding: 11px 6px 11px 14px; font-size: 11.5px; border-radius: 14px; gap: 10px; flex-wrap: wrap; row-gap: 6px; }
   .install__cmd { font-size: 11.5px; }
-  .install__scope { display: none; }
   .install__sep { display: none; }
   .install__action { padding: 6px 11px; font-size: 11px; margin-left: auto; }
   .install .icon-copy, .install .icon-check { width: 13px; height: 13px; }
@@ -1459,7 +1490,12 @@ em {
   .tui { padding: 12px; }
   .tui__panes { grid-template-columns: 1fr; gap: 14px; min-height: 0; }
   .pane { min-height: 0; }
-  .pane--list { max-height: 220px; }
+  /* Hard-lock BOTH pane heights so autopilot session-switches +
+     search/continue overlay toggles can't bounce the page. max-height
+     wasn't enough on tablet-portrait widths where the grid row was
+     still free to stretch to the larger pane's intrinsic height. */
+  .pane--list { height: 220px; }
+  .pane--preview { height: 360px; }
   .pane__title { font-size: 10.5px; }
   .pane__featurebar { gap: 16px; font-size: 11.5px; }
   .msg__header { font-size: 12px; flex-wrap: wrap; }
@@ -1471,7 +1507,12 @@ em {
 
   /* problem */
   .problem { padding: 64px 18px; }
-  .problem__line { font-size: clamp(36px, 11vw, 56px); transform: rotate(-1deg); }
+  /* On phones the rotated/indented hero line wraps "where the terminal
+     scrolls." awkwardly and clips past the right edge. Flatten the line:
+     smaller type, no skew, no second-line indent so both lines sit on the
+     left margin and break naturally. */
+  .problem__line { font-size: clamp(30px, 9vw, 44px); line-height: 1.12; transform: none; }
+  .problem__line-2 { margin-left: 0; }
   .problem__tree { font-size: 10.5px; padding: 18px 20px; }
 
   /* strips */

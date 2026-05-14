@@ -58,7 +58,7 @@ describe("CodexProvider.listSessions", () => {
     const list = await new CodexProvider().listSessions(root);
     const empty = list.find(m => m.id === "019e10c0-2222-7000-aaaa-000000000002")!;
     expect(empty.summary).toBe("(empty session)");
-    expect(empty.messageCount).toBe(0);
+    expect(empty.messageCounts).toEqual({ concise: 0, full: 0 });
   });
 
   test("returns empty list when the codex root doesn't exist", async () => {

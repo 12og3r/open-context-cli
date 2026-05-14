@@ -260,6 +260,7 @@ export function SessionBrowser({
               selectedId={selected?.id ?? null}
               width={leftInnerWidth}
               height={listHeight}
+              displayMode={settings.displayMode}
             />
             {sessions.length === 0 && (
               <Text dimColor>{t(lang, "empty.sessions")}</Text>

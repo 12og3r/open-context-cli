@@ -10,7 +10,7 @@ const session: SessionMeta = {
   summary: "测试会话 example",
   projectPath: "/tmp/proj",
   modifiedAt: new Date(0),
-  messageCount: 12,
+  messageCounts: { concise: 12, full: 12 },
   source: "claude-code",
 };
 

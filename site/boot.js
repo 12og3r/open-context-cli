@@ -47,10 +47,10 @@
   // SETTLE is short — the page is already visible halfway through SCATTER, so
   // settle is just a small buffer before finish() removes the overlay.
   const T = IS_MOBILE
-    ? { hook: 400,  burst: 700,  assemble: 1100, thunk: 350, scatter: 850, settle: 200,
-        end:  3600, useDolly: false, useGlyphBlur: false, fragCount: 5 }
-    : { hook: 500,  burst: 700,  assemble: 1600, thunk: 500, scatter: 1200, settle: 350,
-        end:  4850, useDolly: true, useGlyphBlur: true, fragCount: 8 };
+    ? { hook: 400,  burst: 320,  assemble: 1100, thunk: 350, scatter: 850, settle: 200,
+        end:  3220, useDolly: false, useGlyphBlur: false, fragCount: 5 }
+    : { hook: 500,  burst: 320,  assemble: 1600, thunk: 500, scatter: 1200, settle: 350,
+        end:  4470, useDolly: true, useGlyphBlur: true, fragCount: 8 };
 
   // Phase boundaries derived
   T.b0 = 0;
@@ -94,6 +94,26 @@
       ? document.fonts.load('italic 500 100px "Fraunces"').catch(() => null)
       : Promise.resolve(null);
     await Promise.race([fontPromise, sleep(200)]);
+
+    // Pre-warm GPU filter pipelines for letters. At opacity 0 the browser may
+    // skip layer promotion / filter buffer allocation entirely. Bumping to
+    // 0.001 keeps them visually invisible but forces real rendering, so the
+    // 7 offscreen blur buffers (≈400×400 px each on Retina) get allocated
+    // during HOOK instead of all-at-once at BURST t=0. The BURST keyframes
+    // override these inline values once they start.
+    if (T.useGlyphBlur) {
+      letters.forEach(el => {
+        el.style.opacity = '0.001';
+        el.style.filter = 'blur(0.01px)';
+      });
+    }
+
+    // Warm-up: let the browser flush layout + GPU layer promotion from
+    // buildLetters/buildFragments (and script.js's renderInitialTui, which
+    // runs in parallel on DOMContentLoaded) BEFORE the first animation fires.
+    // Without this, the first few frames of phaseHook drop while the
+    // compositor is still uploading textures.
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     // Skip handlers
     ctrl = new AbortController();
@@ -153,14 +173,37 @@
       { duration: T.burst, easing: 'cubic-bezier(.7, 0, .2, 1)', fill: 'forwards' }
     ));
 
-    // Letters spawn at random positions (will fly home during ASSEMBLE)
-    letters.forEach((el) => {
+    // Letters: fade-in (opacity) + fly-home (transform + filter) run
+    // CONCURRENTLY here. Each letter starts moving the instant it starts
+    // fading in — no "appear, sit still, then fly" pattern, and no
+    // BURST→ASSEMBLE phase boundary on letters at all (phaseAssemble just
+    // awaits the flights this loop kicked off). Same i*stagger delay is
+    // applied to both animations so each letter's appearance lines up with
+    // the start of its own motion.
+    const lStagger = T.useDolly ? 30 : 20;
+    const flightDuration = Math.max(700, (T.burst + T.assemble) - lStagger * letters.length);
+    const startFilter = T.useGlyphBlur ? 'blur(12px)' : 'none';
+    const endFilter   = 'blur(0)';
+    letters._flights = letters.map((el, i) => {
       const init = el._init;
-      el.style.transform = `translate(-50%, -50%) translate(${init.x}px, ${init.y}px) translateZ(${init.z}px) rotateX(${init.rx}deg) rotateY(${init.ry}deg)`;
+      const finalX = el._finalX;
+      const initTransform  = `translate(-50%, -50%) translate(${init.x}px, ${init.y}px) translateZ(${init.z}px) rotateX(${init.rx}deg) rotateY(${init.ry}deg)`;
+      const finalTransform = `translate(-50%, -50%) translate(${finalX}px, 0) translateZ(0) rotateX(0) rotateY(0)`;
+      el.style.transform = initTransform;
+      // Fade-in: opacity only — filter is owned by fly-home so they don't fight.
       el.animate(
         [{ opacity: 0 }, { opacity: 1 }],
-        { duration: 320, easing: 'ease-out', fill: 'forwards' }
+        { duration: 280, delay: i * lStagger, easing: 'ease-out', fill: 'forwards' }
       );
+      // Fly-home: transform + filter, runs through BURST + ASSEMBLE.
+      const a = track(el.animate(
+        [
+          { transform: initTransform,  filter: startFilter },
+          { transform: finalTransform, filter: endFilter },
+        ],
+        { duration: flightDuration, delay: i * lStagger, easing: 'cubic-bezier(.16, 1.1, .3, 1)', fill: 'forwards' }
+      ));
+      return a.finished.catch(() => {});
     });
 
     // Fragments tumble in
@@ -169,7 +212,7 @@
       el.style.transform = `translate(-50%, -50%) translate(${init.x}px, ${init.y}px) translateZ(${init.z}px) rotateX(${init.rx}deg) rotateY(${init.ry}deg)`;
       track(el.animate(
         [{ opacity: 0 }, { opacity: .85 }],
-        { duration: 280 + i * 30, easing: 'ease-out', fill: 'forwards' }
+        { duration: 200 + i * 15, easing: 'ease-out', fill: 'forwards' }
       ));
     });
 
@@ -191,33 +234,10 @@
       ));
     }
 
-    // Letters: 90ms stagger, fly home along curved path
-    const stagger = T.useDolly ? 90 : 50;
-    const flightDuration = Math.max(700, T.assemble - stagger * letters.length);
-    const blurEnabled = T.useGlyphBlur;
-
-    const flights = letters.map((el, i) => {
-      const init = el._init;
-      const finalX = el._finalX;
-      const startFilter = blurEnabled ? 'blur(12px)' : 'none';
-      const endFilter   = 'blur(0)';
-      const a = track(el.animate(
-        [
-          {
-            transform: `translate(-50%, -50%) translate(${init.x}px, ${init.y}px) translateZ(${init.z}px) rotateX(${init.rx}deg) rotateY(${init.ry}deg)`,
-            filter: startFilter,
-            opacity: 1,
-          },
-          {
-            transform: `translate(-50%, -50%) translate(${finalX}px, 0) translateZ(0) rotateX(0) rotateY(0)`,
-            filter: endFilter,
-            opacity: 1,
-          },
-        ],
-        { duration: flightDuration, delay: i * stagger, easing: 'cubic-bezier(.16, 1.1, .3, 1)', fill: 'forwards' }
-      ));
-      return a.finished.catch(() => {});
-    });
+    // Letter flights were kicked off back in phaseBurst (so each letter's
+    // fade-in and fly-home run concurrently with no phase-boundary stall).
+    // Here we just collect the promises to await at the end of this phase.
+    const flights = letters._flights || [];
 
     // Fragments: continue tumbling but lighter — they're decoration
     fragments.forEach((el, i) => {
@@ -365,9 +385,11 @@
     const emWidth = fontSize * 0.56; // ish for italic Fraunces
     const startX = -((chars.length - 1) / 2) * emWidth;
 
+    // Match the hero wordmark: "open" stays linen, "ctx" gets the ember accent.
+    const accentStart = text.length - 3;
     return chars.map((ch, i) => {
       const span = document.createElement('span');
-      span.className = 'boot__glyph';
+      span.className = i >= accentStart ? 'boot__glyph boot__glyph--ctx' : 'boot__glyph';
       span.textContent = ch;
       span.style.position = 'absolute';
       span.style.left = '50%';

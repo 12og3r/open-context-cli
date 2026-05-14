@@ -128,7 +128,8 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
   let latestSlug = "";
   let firstUserText = "";
   let firstTaskSubject = "";
-  let messageCount = 0;
+  let conciseCount = 0;
+  let fullCount = 0;
   let recordedCwd = "";
 
   const rl = readline.createInterface({
@@ -145,7 +146,16 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
     } else if (type === "custom-title" && typeof entry.customTitle === "string") {
       customTitle = entry.customTitle;
     } else if ((type === "user" || type === "assistant")) {
-      messageCount += 1;
+      // Count what the preview will actually render under each display mode,
+      // not raw JSONL entries — a single assistant entry can fan out into
+      // {text, tool_use, tool_result} rows, and an entry with only a
+      // tool_result produces zero user/assistant rows. The list count needs
+      // to match what the user sees when they open the session.
+      const fanned = messagesFromEntry(entry);
+      fullCount += fanned.length;
+      for (const m of fanned) {
+        if (m.role === "user" || m.role === "assistant") conciseCount += 1;
+      }
       if (!firstUserText && type === "user" && entry.isMeta !== true) {
         firstUserText = extractFirstUserText(entry);
       }
@@ -175,7 +185,7 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
     summary,
     projectPath,
     modifiedAt: stat.mtime,
-    messageCount,
+    messageCounts: { concise: conciseCount, full: fullCount },
     cwd: recordedCwd || undefined,
     source: "claude-code",
   };

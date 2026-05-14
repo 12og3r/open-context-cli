@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { Box, Text } from "ink";
 import type { SessionMeta, Source } from "../providers/types.ts";
+import type { DisplayMode } from "../lib/settings.ts";
 import { relativeTime } from "../lib/relative-time.ts";
 import { truncate } from "../lib/truncate.ts";
 import { t, type Lang } from "../lib/i18n.ts";
@@ -35,12 +36,17 @@ export function SessionList({
   width,
   height,
   now = new Date(),
+  displayMode = "full",
 }: {
   sessions: SessionMeta[];
   selectedId: string | null;
   width: number;
   height?: number;
   now?: Date;
+  // Which count to render in the subtitle. Defaults to "full" to match the
+  // settings default; the browser passes the user's current setting so the
+  // shown number tracks what the preview actually renders.
+  displayMode?: DisplayMode;
 }) {
   const lang = useLang();
   const innerWidth = Math.max(1, width);
@@ -51,7 +57,7 @@ export function SessionList({
     <Box flexDirection="column" width={width} flexShrink={0}>
       {visible.map((s, i) => (
         <Box key={s.id} flexDirection="column" flexShrink={0}>
-          <Item meta={s} selected={s.id === selectedId} innerWidth={innerWidth} now={now} lang={lang} />
+          <Item meta={s} selected={s.id === selectedId} innerWidth={innerWidth} now={now} lang={lang} displayMode={displayMode} />
           {i < visible.length - 1 && <Box height={1} flexShrink={0} />}
         </Box>
       ))}
@@ -87,12 +93,13 @@ function windowSessions(
   return sessions.slice(start, start + capacity);
 }
 
-function Item({ meta, selected, innerWidth, now, lang }: {
+function Item({ meta, selected, innerWidth, now, lang, displayMode }: {
   meta: SessionMeta;
   selected: boolean;
   innerWidth: number;
   now: Date;
   lang: Lang;
+  displayMode: DisplayMode;
 }) {
   const sourceColor = SOURCE_COLOR[meta.source];
   // Title row: the selection bar (▌) marks selected rows in the source's
@@ -105,7 +112,8 @@ function Item({ meta, selected, innerWidth, now, lang }: {
   // joined with single-space dots to keep the row tight on narrow panes.
   // The source prefix is always shown; the rest is truncated if needed.
   const sourceLabel = `[${sourceChipLabel(meta.source, lang)}]`;
-  const rest = ` ${relativeTime(meta.modifiedAt, now, lang)} · ${meta.messageCount} ${t(lang, "list.msgs_suffix")}`;
+  const count = meta.messageCounts[displayMode];
+  const rest = ` ${relativeTime(meta.modifiedAt, now, lang)} · ${count} ${t(lang, "list.msgs_suffix")}`;
   const restWidth = Math.max(0, innerWidth - sourceLabel.length);
   return (
     <Box flexDirection="column" flexShrink={0}>

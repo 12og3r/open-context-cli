@@ -8,12 +8,14 @@ const NOW = new Date("2026-05-07T12:00:00Z");
 const SESSIONS: SessionMeta[] = [
   {
     id: "a", filePath: "/a.jsonl", summary: "Building Ink TUI app", projectPath: "/p",
-    modifiedAt: new Date("2026-05-07T10:00:00Z"), messageCount: 24,
+    modifiedAt: new Date("2026-05-07T10:00:00Z"),
+    messageCounts: { concise: 24, full: 42 },
     source: "claude-code",
   },
   {
     id: "b", filePath: "/b.jsonl", summary: "Refactor parser", projectPath: "/p",
-    modifiedAt: new Date("2026-05-06T22:00:00Z"), messageCount: 18,
+    modifiedAt: new Date("2026-05-06T22:00:00Z"),
+    messageCounts: { concise: 18, full: 30 },
     source: "codex",
   },
 ];
@@ -26,9 +28,31 @@ describe("SessionList", () => {
     const out = lastFrame() ?? "";
     expect(out).toContain("Building Ink TUI app");
     expect(out).toContain("2h ago");
-    expect(out).toContain("24 msgs");
+    // Default displayMode is "full" (matches settings.ts default), so the
+    // subtitle uses each session's full-mode count.
+    expect(out).toContain("42 msgs");
     expect(out).toContain("Refactor parser");
+    expect(out).toContain("30 msgs");
+  });
+
+  test("subtitle count tracks the displayMode prop", () => {
+    // Default (no prop) falls back to "full" — the count should match each
+    // session's full-mode count, not concise.
+    const def = render(
+      <SessionList sessions={SESSIONS} selectedId="a" width={60} now={NOW} />
+    );
+    expect(def.lastFrame() ?? "").toContain("42 msgs");
+    expect(def.lastFrame() ?? "").toContain("30 msgs");
+
+    // Switching to concise picks the smaller count instead.
+    const concise = render(
+      <SessionList sessions={SESSIONS} selectedId="a" width={60} now={NOW} displayMode="concise" />
+    );
+    const out = concise.lastFrame() ?? "";
+    expect(out).toContain("24 msgs");
     expect(out).toContain("18 msgs");
+    expect(out).not.toContain("42 msgs");
+    expect(out).not.toContain("30 msgs");
   });
 
   test("subtitle leads with the bracketed source label", () => {
@@ -39,8 +63,8 @@ describe("SessionList", () => {
     // Full names with brackets, matching the preview-pane chip. A single
     // space (no dot) follows the source chip; the rest of the metadata
     // pieces are still joined by single-space dots.
-    expect(out).toMatch(/\[Claude\]\s+2h ago\s+·\s+24 msgs/);
-    expect(out).toMatch(/\[Codex\]\s+Yesterday\s+·\s+18 msgs/);
+    expect(out).toMatch(/\[Claude\]\s+2h ago\s+·\s+42 msgs/);
+    expect(out).toMatch(/\[Codex\]\s+Yesterday\s+·\s+30 msgs/);
   });
 
   test("selected rows lead with the ▌ bar in the source color; unselected rows leave that cell blank", () => {
@@ -82,7 +106,7 @@ describe("SessionList", () => {
       summary: `Session ${i}`,
       projectPath: "/p",
       modifiedAt: new Date("2026-05-07T10:00:00Z"),
-      messageCount: 1,
+      messageCounts: { concise: 1, full: 1 },
       source: "claude-code" as const,
     }));
 

@@ -82,4 +82,30 @@ describe("forkSession", () => {
     const out = (await fs.readFile(dst, "utf8")).trim().split("\n").map(l => JSON.parse(l));
     expect(out[0].cwd).toBe("/keep");
   });
+
+  // Real sessions (claude code 2.x) interleave non-user/assistant entries —
+  // `attachment`, `system`, `last-prompt`, `file-history-snapshot`,
+  // `queue-operation` — between turns, and user/assistant entries routinely
+  // set `parentUuid` to one of those intermediates. Dropping them shreds
+  // the chain `claude --resume` walks from the tail, so the resumed UI
+  // shows only the contiguous run since the first broken link.
+  test("keeps non-allowlisted entries so parentUuid chain stays walkable", async () => {
+    const src = await tmpFile();
+    const dst = await tmpFile();
+    const sample = [
+      JSON.stringify({ type: "summary",     summary: "ignore" }),
+      JSON.stringify({ type: "user",        uuid: "u1",   sessionId: "S0", parentUuid: null,   message: { content: "hi" } }),
+      JSON.stringify({ type: "system",      uuid: "s1",   sessionId: "S0", parentUuid: "u1",   subtype: "local_command" }),
+      JSON.stringify({ type: "attachment",  uuid: "att1", sessionId: "S0", parentUuid: "s1" }),
+      JSON.stringify({ type: "user",        uuid: "u2",   sessionId: "S0", parentUuid: "att1", message: { content: "again" } }),
+      JSON.stringify({ type: "assistant",   uuid: "a1",   sessionId: "S0", parentUuid: "u2",   message: { content: "ok" } }),
+      JSON.stringify({ type: "custom-title", customTitle: "ignore too" }),
+    ].join("\n") + "\n";
+    await fs.writeFile(src, sample);
+    await forkSession({ srcPath: src, dstPath: dst, targetUuid: "a1", targetRole: "assistant", newSessionId: "NEW" });
+    const out = (await fs.readFile(dst, "utf8")).trim().split("\n").map(l => JSON.parse(l));
+    expect(out.map(e => e.uuid)).toEqual(["u1", "s1", "att1", "u2", "a1"]);
+    expect(out.every(e => e.type !== "summary" && e.type !== "custom-title")).toBe(true);
+    expect(out.every(e => e.sessionId === "NEW")).toBe(true);
+  });
 });
