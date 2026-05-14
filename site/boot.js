@@ -385,9 +385,11 @@
     const emWidth = fontSize * 0.56; // ish for italic Fraunces
     const startX = -((chars.length - 1) / 2) * emWidth;
 
+    // Match the hero wordmark: "open" stays linen, "ctx" gets the ember accent.
+    const accentStart = text.length - 3;
     return chars.map((ch, i) => {
       const span = document.createElement('span');
-      span.className = 'boot__glyph';
+      span.className = i >= accentStart ? 'boot__glyph boot__glyph--ctx' : 'boot__glyph';
       span.textContent = ch;
       span.style.position = 'absolute';
       span.style.left = '50%';
