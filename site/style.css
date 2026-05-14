@@ -204,6 +204,11 @@ em {
   position: relative;
   opacity: 0;
   will-change: transform, opacity, filter;
+  /* Italic Fraunces letters (p, c, t, x) overhang the advance-width box on
+     the right via the slant, and 'p' also drops a descender. Without this
+     padding the GPU layer allocated during filter:blur clips the italic ink. */
+  padding: 0.04em 0.14em 0.08em;
+  overflow: visible;
 }
 .boot__glyph--period { color: var(--signal); }
 .boot__glyph--ctx { color: var(--ember); }
