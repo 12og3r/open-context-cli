@@ -313,6 +313,7 @@ em {
 
 .brand { display: inline-flex; align-items: baseline; gap: 8px; }
 .brand__name { font: 500 18px/1 var(--f-sans); color: var(--ink); letter-spacing: -0.02em; }
+.brand__name-ctx { color: var(--ember); }
 .brand__v {
   font: 400 11px/1 var(--f-mono);
   color: var(--ink-4);
@@ -478,6 +479,13 @@ em {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+/* Inner span needs to override both `color` (cascades into inner span as
+   transparent) AND `-webkit-text-fill-color` (otherwise webkit keeps showing
+   the outer's background-clipped fill through the nested text). */
+.hero__wordmark-ctx {
+  color: var(--ember);
+  -webkit-text-fill-color: var(--ember);
 }
 .hero__tagline {
   font: 500 clamp(38px, 5.6vw, 76px)/1 var(--f-serif);
