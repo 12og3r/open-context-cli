@@ -74,6 +74,50 @@ describe("forkGeminiSession", () => {
     expect(setEntry).toBeDefined();
   });
 
+  test("strips sessionId from $set patches so it can't clobber the new bootstrap", async () => {
+    // Gemini's own loader appends `{"$set":{"sessionId":<runtimeId>}}` to
+    // the rollout when resuming a session. If our fork copies that line
+    // verbatim, gemini's loader applies it cumulatively and the effective
+    // sessionId becomes the old runtime id — making `gemini -r <newId>`
+    // fail with "Invalid session identifier".
+    const dir = await tmpdir();
+    const src = path.join(dir, "src.jsonl");
+    const dst = path.join(dir, "dst.jsonl");
+    await fs.writeFile(
+      src,
+      [
+        JSON.stringify({ sessionId: "old-id", projectHash: "deadbeef", startTime: "2026-05-10T09:00:00.000Z", lastUpdated: "2026-05-10T09:00:00.000Z", kind: "main" }),
+        JSON.stringify({ id: "msg-u1", timestamp: "2026-05-10T09:00:01.000Z", type: "user", content: "hi" }),
+        JSON.stringify({ id: "msg-g1", timestamp: "2026-05-10T09:00:02.000Z", type: "gemini", content: "hello" }),
+        JSON.stringify({ $set: { summary: "intro" } }),
+        JSON.stringify({ $set: { sessionId: "resumed-runtime-id" } }),
+        JSON.stringify({ $set: { sessionId: "another-runtime-id", lastUpdated: "2026-05-10T10:00:00.000Z" } }),
+      ].join("\n") + "\n",
+      "utf8",
+    );
+    await forkGeminiSession({
+      srcPath: src,
+      dstPath: dst,
+      targetUuid: "msg-g1",
+      targetRole: "assistant",
+      newSessionId: "the-new-fork-id",
+    });
+    const entries = await readJsonl(dst);
+    expect(entries[0]!.sessionId).toBe("the-new-fork-id");
+    // Simulate gemini's metadata merge: bootstrap, then every $set on top.
+    let effective: Record<string, unknown> = { ...(entries[0] as Record<string, unknown>) };
+    for (const e of entries.slice(1)) {
+      const set = (e as { $set?: Record<string, unknown> }).$set;
+      if (set) effective = { ...effective, ...set };
+    }
+    expect(effective.sessionId).toBe("the-new-fork-id");
+    // Non-sessionId fields in those $set patches must survive: the
+    // summary patch is kept, and the second patch's `lastUpdated` field
+    // survives even though its `sessionId` field was stripped.
+    expect(effective.summary).toBe("intro");
+    expect(effective.lastUpdated).toBe("2026-05-10T10:00:00.000Z");
+  });
+
   test("throws when the cursor uuid isn't present", async () => {
     const dir = await tmpdir();
     const dst = path.join(dir, "missing.jsonl");

@@ -6,7 +6,9 @@ import process from "node:process";
 import type { ContinueRequest } from "./continue-types.ts";
 import type { ContinueResult } from "./continue-launch.ts";
 import { forkGeminiSession } from "./continue-fork-gemini.ts";
-import { runPty } from "./continue-pty.ts";
+import { sweepGeminiOrphans } from "./gemini-orphan-sweep.ts";
+import { stampSourceSummary } from "./gemini-source-summary.ts";
+import { ptyTuningFor, runPty } from "./continue-pty.ts";
 import { spawnNewWindow } from "./continue-spawn.ts";
 import { trace } from "./debug-trace.ts";
 
@@ -31,7 +33,7 @@ export function resolveGeminiLaunchCwd(sourceCwd: string | undefined): string {
  * before sending.
  */
 export async function executeContinueGemini(req: ContinueRequest): Promise<ContinueResult> {
-  trace("launch-gemini", `enter mode=${req.launchMode} role=${req.targetRole} session=${req.sessionId.slice(0, 8)}`);
+  trace("launch-gemini", `enter mode=${req.launchMode} role=${req.targetRole} session=${req.sessionId.slice(0, 8)} sourcePath=${req.sourcePath}`);
 
   if (req.launchMode === "reuse-current" && !process.stdout.isTTY) {
     return { ok: false, error: "current stdout is not a TTY" };
@@ -51,10 +53,26 @@ export async function executeContinueGemini(req: ContinueRequest): Promise<Conti
   const newId = randomUUID();
   const chatsDir = path.dirname(req.sourcePath);
   const dstPath = forkedSessionPath(chatsDir, newId);
-  trace("launch-gemini", `fork → ${dstPath}`);
+  trace("launch-gemini", `chatsDir=${chatsDir}`);
+  trace("launch-gemini", `newId=${newId}`);
+  trace("launch-gemini", `dstPath=${dstPath}`);
 
   try {
     await fsp.mkdir(chatsDir, { recursive: true });
+    // Sweep orphan bootstrap files BEFORE forking. Gemini's previous `-r`
+    // runs leave behind 228-byte bootstrap-only files that, on the next
+    // gemini startup, trigger a cascade-delete of every file sharing their
+    // shortId — including legitimate openctx forks. See gemini-orphan-sweep.ts.
+    const swept = await sweepGeminiOrphans(chatsDir);
+    if (swept > 0) trace("launch-gemini", `pre-fork sweep removed ${swept} orphan bootstrap(s)`);
+    // Stamp `$set:{summary, memoryScratchpad}` on the SOURCE before forking.
+    // Without this, gemini's background `generateSummary` task on the next
+    // `-r` startup will overwrite the source with a generic LLM summary like
+    // "User wants help with a software engineering task.". The stamped line
+    // also flows through to the new fork via the $set copy in
+    // forkGeminiSession — both files end up with the same summary.
+    const stamped = await stampSourceSummary(req.sourcePath);
+    if (stamped) trace("launch-gemini", `stamped source summary="${stamped.slice(0, 40)}"`);
     await forkGeminiSession({
       srcPath: req.sourcePath,
       dstPath,
@@ -62,16 +80,24 @@ export async function executeContinueGemini(req: ContinueRequest): Promise<Conti
       targetRole: req.targetRole,
       newSessionId: newId,
     });
+    const dstStat = await fsp.stat(dstPath).catch(() => null);
+    trace("launch-gemini", `fork wrote ${dstStat?.size ?? "?"} bytes`);
   } catch (e) {
     trace("launch-gemini", `fork FAIL: ${(e as Error).message}`);
     return { ok: false, error: `failed to fork gemini session: ${(e as Error).message}` };
   }
 
   const command = { exe: "gemini", args: ["-r", newId] };
+  trace("launch-gemini", `spawning: gemini -r ${newId} (cwd=${cwd})`);
 
   if (req.launchMode === "reuse-current") {
     try {
-      const code = await runPty({ cwd, command, prefillText: req.userText });
+      const code = await runPty({
+        cwd,
+        command,
+        prefillText: req.userText,
+        ...ptyTuningFor(command.exe),
+      });
       return { ok: true, childExitCode: code };
     } catch (e) {
       await silentRemove(dstPath);
