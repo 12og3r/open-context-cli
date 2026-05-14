@@ -113,9 +113,21 @@ describe("GeminiProvider.listSessions", () => {
     const list = await new GeminiProvider().listSessions(root);
     const rewind = list.find(m => m.id === "019e10b0-3333-4000-8000-aaa000000003")!;
     // After applying $rewindTo on msg-u2, the surviving messages are
-    // msg-u1, msg-g1, msg-u3, msg-g3 → 4 visible messages.
-    expect(rewind.messageCount).toBe(4);
+    // msg-u1, msg-g1, msg-u3, msg-g3 → 4 visible rows in both display
+    // modes (no tool calls in this fixture).
+    expect(rewind.messageCounts).toEqual({ concise: 4, full: 4 });
     expect(rewind.summary).toBe("first question");
+  });
+
+  test("full count includes tool_use/tool_result rows; concise count omits them", async () => {
+    // The with-tools fixture has 1 user, 1 gemini assistant with one
+    // toolCalls entry. messagesFromRecord fans the gemini line into
+    // [assistant text, tool_use, tool_result] — 4 rows for "full",
+    // 2 (user + assistant) for "concise".
+    const root = await makeRoot();
+    const list = await new GeminiProvider().listSessions(root);
+    const tools = list.find(m => m.id === "019e10b0-2222-4000-8000-aaa000000002")!;
+    expect(tools.messageCounts).toEqual({ concise: 2, full: 4 });
   });
 
   test("empty session falls back to the (empty session) sentinel", async () => {
@@ -123,7 +135,7 @@ describe("GeminiProvider.listSessions", () => {
     const list = await new GeminiProvider().listSessions(root);
     const empty = list.find(m => m.id === "019e10b0-4444-4000-8000-aaa000000004")!;
     expect(empty.summary).toBe("(empty session)");
-    expect(empty.messageCount).toBe(0);
+    expect(empty.messageCounts).toEqual({ concise: 0, full: 0 });
   });
 
   test("malformed JSON lines are skipped without aborting the file", async () => {

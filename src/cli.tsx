@@ -22,11 +22,13 @@ function printHelp() {
 
 Usage:
   openctx [--no-emoji]
+  openctx version
   openctx update [<version>]
   openctx --version
   openctx --help
 
 Commands:
+  version              Print the openctx version and exit (same as -v).
   update [<version>]   Reinstall openctx via the package manager that
                        installed it (npm / bun / pnpm / yarn). Pass a
                        version (e.g. \`0.2.0\`) to pin; omit to take latest.
@@ -40,10 +42,19 @@ Configure session directories per source from the in-app Settings panel.
 `);
 }
 
-// `openctx update [<version>]` is intercepted before flag parsing so it
-// doesn't have to share argument shape with the browser. It dispatches to
-// the package manager that installed openctx and exits with the child's
-// exit code — Ink is never mounted on this path.
+// Bare subcommands handled before flag parsing so they don't have to
+// share argument shape with the browser. Ink is never mounted on these
+// paths.
+
+// `openctx version` mirrors `openctx -v` — the flag form is what package
+// managers (npm, bun, pnpm) probe to detect installed CLIs, but humans
+// reaching for `version` as a subcommand (mirroring `git`, `gh`, etc.)
+// shouldn't have to remember it's flag-only.
+if (process.argv[2] === "version") {
+  process.stdout.write(`${pkg.version}\n`);
+  process.exit(0);
+}
+
 if (process.argv[2] === "update") {
   const { runUpdate } = await import("./lib/update.ts");
   process.exit(await runUpdate({ version: process.argv[3] }));

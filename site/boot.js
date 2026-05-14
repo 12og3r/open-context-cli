@@ -425,6 +425,10 @@
     'rollout-7c1e.jsonl',
     'tool: Edit',
     '⏎ continue',
+    '[Gemini] 13:41',
+    '~/.gemini/tmp',
+    'session-abcd1234.jsonl',
+    'vertex-ai-spike',
   ];
 
   function buildFragments(n, container) {

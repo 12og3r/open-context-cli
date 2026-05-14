@@ -1,15 +1,17 @@
 # openctx
 
-A terminal UI for browsing your local Claude Code **and Codex CLI** session
-history in one place.
+A terminal UI for browsing your local Claude Code, **Codex**, and
+**Gemini CLI** session history in one place.
 
 `openctx` reads the JSONL transcripts that Claude Code writes to
-`~/.claude/projects/` and the rollouts that Codex CLI writes to
-`~/.codex/sessions/`, merging them into a single two-pane browser:
-sessions on the left, the rendered conversation on the right. Each row
-is tagged with the source CLI it came from. Markdown is rendered to
-ANSI, tool calls collapse to one line by default, and a `Ctrl-F` search
-inside the preview lets you jump through hits in the active conversation.
+`~/.claude/projects/`, the rollouts that Codex CLI writes to
+`~/.codex/sessions/`, and the per-project chats Gemini CLI writes under
+`~/.gemini/tmp/<project>/chats/`, merging them into a single two-pane
+browser: sessions on the left, the rendered conversation on the right.
+Each row is tagged with the source CLI it came from. Markdown is
+rendered to ANSI, tool calls collapse to one line by default, and a
+`Ctrl-F` search inside the preview lets you jump through hits in the
+active conversation.
 
 ## Install
 
@@ -38,11 +40,11 @@ bun run dev
 ## Usage
 
 ```bash
-openctx                      # scan ~/.claude/projects and ~/.codex/sessions
+openctx                      # scan ~/.claude/projects, ~/.codex/sessions, and ~/.gemini/tmp
 openctx --no-emoji           # plain role labels instead of emoji
 openctx update               # reinstall to the latest version
 openctx update 0.2.0         # pin a specific version
-openctx -v                   # print version and exit
+openctx version              # print version and exit (or `openctx -v`)
 openctx --help
 ```
 

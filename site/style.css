@@ -35,6 +35,9 @@
   --moss:         #38614A;          /* cool decorative + signature caret */
   --moss-soft:    #5A8470;
   --moss-halo:    rgba(56, 97, 74, .14);
+  --honey:        #B0782B;          /* Gemini source accent on Linen */
+  --honey-soft:   #C99634;
+  --honey-halo:   rgba(176, 120, 43, .14);
 
   /* terminal interior */
   --t-bg:         #0E1116;
@@ -688,10 +691,13 @@ em {
 .session__rest { color: var(--t-fg-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 .session[data-src="cc"] .session__src { color: var(--t-cyan); }
 .session[data-src="cx"] .session__src { color: var(--t-magenta); }
+.session[data-src="gm"] .session__src { color: var(--t-amber); }
 .session.is-active[data-src="cc"] .session__bar,
 .session.is-active[data-src="cc"] .session__summary { color: var(--t-cyan); font-weight: 500; }
 .session.is-active[data-src="cx"] .session__bar,
 .session.is-active[data-src="cx"] .session__summary { color: var(--t-magenta); font-weight: 500; }
+.session.is-active[data-src="gm"] .session__bar,
+.session.is-active[data-src="gm"] .session__summary { color: var(--t-amber); font-weight: 500; }
 
 .pane__featurebar {
   border-top: 1px solid rgba(255, 255, 255, .04);
@@ -950,6 +956,7 @@ em {
 }
 .strip__chip--cc { color: var(--signal); background: rgba(44, 91, 255, .1); }
 .strip__chip--cx { color: var(--ember); background: rgba(232, 85, 43, .1); }
+.strip__chip--gm { color: var(--honey); background: rgba(176, 120, 43, .12); }
 
 .strip__visual {
   position: relative;
@@ -992,9 +999,11 @@ em {
 .snap__row { padding: 5px 0; color: var(--t-fg-dim); }
 .snap__row.is-active { color: var(--t-cyan); }
 .snap__row.is-active[data-src="cx"] { color: var(--t-magenta); }
+.snap__row.is-active[data-src="gm"] { color: var(--t-amber); }
 .snap__sum { color: inherit; }
 .snap__chip-cc { color: var(--t-cyan); font-weight: 600; }
 .snap__chip-cx { color: var(--t-magenta); font-weight: 600; }
+.snap__chip-gm { color: var(--t-amber); font-weight: 600; }
 .snap__rest { color: var(--t-fg-faint); }
 
 .snap__search {

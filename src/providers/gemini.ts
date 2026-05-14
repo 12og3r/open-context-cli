@@ -142,13 +142,12 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
   let kind: string | undefined;
   let summary = "";
   let directoriesFirst = "";
-  let firstUserText = "";
-  let firstAssistantText = "";
-  // Track message ids in arrival order so rewind records can pop entries
-  // before they ever count toward the visible-message tally.
-  const messageIds: string[] = [];
-  const messageRoles = new Map<string, "user" | "gemini" | "other">();
-  const messageTexts = new Map<string, string>();
+  // Track surviving messages in arrival order so rewind records can pop
+  // entries before they ever count toward the visible tally. We keep the
+  // full record (not just the id) so the final pass can fan it through
+  // messagesFromRecord and count exactly what the preview will render
+  // under each display mode — matching what claude-code and codex do.
+  const surviving: GeminiMessageRecord[] = [];
 
   const rl = readline.createInterface({
     input: createReadStream(filePath, { encoding: "utf-8" }),
@@ -161,19 +160,14 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
 
     if (typeof rec.$rewindTo === "string") {
       const targetId = rec.$rewindTo;
-      const idx = messageIds.indexOf(targetId);
+      const idx = surviving.findIndex(m => m.id === targetId);
       if (idx >= 0) {
-        for (const id of messageIds.splice(idx)) {
-          messageRoles.delete(id);
-          messageTexts.delete(id);
-        }
+        surviving.splice(idx);
       } else {
         // Target already gone — gemini's loader clears the entire run in
         // this case; we follow suit so the summary survives nothing-left
         // rewinds (rare in practice).
-        messageIds.length = 0;
-        messageRoles.clear();
-        messageTexts.clear();
+        surviving.length = 0;
       }
       continue;
     }
@@ -200,13 +194,7 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
     }
 
     if (typeof rec.id === "string" && typeof rec.type === "string") {
-      const id = rec.id;
-      const type = rec.type as string;
-      const role = type === "user" ? "user" : type === "gemini" ? "gemini" : "other";
-      messageIds.push(id);
-      messageRoles.set(id, role);
-      const text = stringifyContent(rec.content);
-      if (text) messageTexts.set(id, text);
+      surviving.push(rec as unknown as GeminiMessageRecord);
     }
   }
 
@@ -219,14 +207,25 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
   // skip rather than surface a half-decoded entry.
   if (!sessionId) return null;
 
-  let messageCount = 0;
-  for (const id of messageIds) {
-    if (messageRoles.get(id) !== "other") messageCount += 1;
-    if (!firstUserText && messageRoles.get(id) === "user") {
-      firstUserText = (messageTexts.get(id) ?? "").trim();
+  let conciseCount = 0;
+  let fullCount = 0;
+  let firstUserText = "";
+  let firstAssistantText = "";
+  for (const rec of surviving) {
+    // Count what the preview actually renders: fanning a gemini-type
+    // record produces an assistant text row plus tool_use/tool_result
+    // rows for every toolCalls entry, and a tool-result-only assistant
+    // turn yields zero concise rows.
+    const fanned = messagesFromRecord(rec);
+    fullCount += fanned.length;
+    for (const m of fanned) {
+      if (m.role === "user" || m.role === "assistant") conciseCount += 1;
     }
-    if (!firstAssistantText && messageRoles.get(id) === "gemini") {
-      const raw = messageTexts.get(id) ?? "";
+    if (!firstUserText && rec.type === "user") {
+      firstUserText = stringifyContent(rec.content).trim();
+    }
+    if (!firstAssistantText && rec.type === "gemini") {
+      const raw = stringifyContent(rec.content);
       firstAssistantText = (raw.split("\n")[0] ?? "").trim();
     }
   }
@@ -242,7 +241,7 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
     summary,
     projectPath: cwd,
     modifiedAt: stat.mtime,
-    messageCount,
+    messageCounts: { concise: conciseCount, full: fullCount },
     cwd: cwd || undefined,
     source: "gemini",
   };

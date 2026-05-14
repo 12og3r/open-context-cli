@@ -172,6 +172,20 @@ const SESSIONS = [
         body: '<span class="md-fold">server/auth.ts  (1 hunk)</span>' },
     ],
   },
+  { src: 'gm', summary: 'vertex-ai-spike — long-context regressions', path: '~/projects/api', rel: '2h ago', msgs: 41, current: 1,
+    conv: [
+      { role: 'user',      emoji: '👨', label: 'user',      rel: '2h ago', clock: '13:41',
+        body: 'compare 1M-token recall between <span class="md-code">gemini-2.5-pro</span> and <span class="md-code">gemini-2.0-flash</span> on the rag corpus.' },
+      { role: 'assistant', emoji: '✦',  label: 'gemini',    rel: '2h ago', clock: '13:42',
+        body:
+          '<span class="md-h">## Recall @ 1M tokens</span>\n\n' +
+          '  • <span class="md-code">2.5-pro</span> — 94% needle-in-haystack on the 980k-token corpus\n' +
+          '  • <span class="md-code">2.0-flash</span> — 71% on the same corpus, 4.6× cheaper\n\n' +
+          "I'd route the first pass through flash and escalate to pro on confidence < 0.7." },
+      { role: 'tool', emoji: '🔧', label: 'run_shell_command', rel: '2h ago', clock: '13:43',
+        body: '<span class="md-fold">bench/needle.ts  · 980k tokens · 41s</span>' },
+    ],
+  },
   { src: 'cc', summary: 'ink-renderer-bug — flicker on hold ↓', path: '~/projects/openctx', rel: '3h ago',    msgs: 124, current: 1,
     conv: [
       { role: 'user',      emoji: '👨', label: 'user',      rel: '3h ago', clock: '11:08',
@@ -216,6 +230,16 @@ const SESSIONS = [
           'Linen base. Signal Blue acts. Ember informs. Moss decorates. Three tinted papers, real grain, an asymmetric hero.' },
     ],
   },
+  { src: 'gm', summary: 'long-context-eval — 2M-token ingest path', path: '~/projects/data', rel: '2d ago', msgs: 96, current: 1,
+    conv: [
+      { role: 'user',      emoji: '👨', label: 'user',      rel: '2d ago', clock: '14:08',
+        body: 'why is the 2M-token ingest 4× slower than the 1M one? both stream the same way.' },
+      { role: 'assistant', emoji: '✦',  label: 'gemini',    rel: '2d ago', clock: '14:09',
+        body:
+          'The chunker copies the full buffer on every <span class="md-code">slice()</span>. At 2M it dominates wall time.\n\n' +
+          'Switch to byte-offset windowing — same chunker, zero copies.' },
+    ],
+  },
   { src: 'cc', summary: 'pty-runtime-split — node vs bun', path: '~/projects/openctx', rel: '2d ago', msgs: 22, current: 1,
     conv: [
       { role: 'user',      emoji: '👨', label: 'user',      rel: '2d ago', clock: '23:21',
@@ -243,11 +267,16 @@ const SESSIONS = [
   },
 ];
 
+// Short-source-code → display-label map. Keeping this in one place lets the
+// list row, continue-footer, and any future surface stay in sync with the
+// real TUI's i18n table (source.claude_code / source.codex / source.gemini).
+const SOURCE_LABEL = { cc: 'Claude', cx: 'Codex', gm: 'Gemini' };
+
 function renderSessionList(activeIdx) {
   return SESSIONS.map((s, i) => `
     <div class="session${i === activeIdx ? ' is-active' : ''}" data-src="${s.src}" data-idx="${i}">
       <div class="session__row1"><span class="session__bar">▌</span><span class="session__summary">${s.summary}</span></div>
-      <div class="session__row2"><span class="session__src">[${s.src === 'cc' ? 'Claude' : 'Codex'}]</span><span class="session__rest">${s.rel} · ${s.msgs} msgs</span></div>
+      <div class="session__row2"><span class="session__src">[${SOURCE_LABEL[s.src]}]</span><span class="session__rest">${s.rel} · ${s.msgs} msgs</span></div>
     </div>
   `).join('');
 }
@@ -294,7 +323,7 @@ function renderConversation(session, opts = {}) {
   const tail = continueOpen ? `
     <div class="continue-footer is-open">
       <span class="continue-footer__label">↪ Continue conversation</span>
-      <span class="continue-footer__src">[${session.src === 'cc' ? 'Claude' : 'Codex'}]</span>
+      <span class="continue-footer__src">[${SOURCE_LABEL[session.src]}]</span>
     </div>` : '';
   return head + items + tail;
 }

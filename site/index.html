@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>openctx — find any session, in a keystroke</title>
-  <meta name="description" content="A keyboard-first browser for every Claude Code and Codex CLI conversation you've ever had." />
+  <meta name="description" content="A keyboard-first browser for every Claude Code, Codex, and Gemini CLI conversation you've ever had." />
   <meta name="theme-color" content="#F4F5F7" media="(prefers-color-scheme: light)" />
 
   <meta property="og:title" content="openctx" />
@@ -77,7 +77,7 @@
   <header class="nav">
     <a class="brand" href="#top" aria-label="openctx home">
       <span class="brand__name">open<span class="brand__name-ctx">ctx</span></span>
-      <span class="brand__v" id="brand-v">v0.2.7</span>
+      <span class="brand__v" id="brand-v">v0.3.0</span>
     </a>
     <nav class="nav__menu" aria-label="primary">
       <a href="#features"><span class="nav__no">01</span> Features</a>
@@ -102,7 +102,7 @@
             <span class="hero__tagline-l2">In a keystroke.</span>
           </p>
           <p class="hero__sub">
-            A keyboard-first browser for every Claude Code <span class="hero__sub-amp">&amp;</span> Codex conversation you've ever had.
+            A keyboard-first browser for every Claude Code, Codex <span class="hero__sub-amp">&amp;</span> Gemini conversation you've ever had.
           </p>
         </div>
 
@@ -219,16 +219,18 @@
           <div class="strip__text">
             <p class="strip__no" data-motion-child>01</p>
             <h2 class="strip__title" data-motion-child>
-              Two CLIs, <em>one pane.</em>
+              Three CLIs, <em>one pane.</em>
             </h2>
             <p class="strip__body" data-motion-child>
-              Reads <code>~/.claude/projects/</code> and <code>~/.codex/sessions/</code>
-              into the same view. Every row is tagged with the source CLI so you
-              know which tool ran the conversation.
+              Reads <code>~/.claude/projects/</code>, <code>~/.codex/sessions/</code>,
+              and <code>~/.gemini/tmp/</code> into the same view. Every row is
+              tagged with the source CLI so you know which tool ran the
+              conversation.
             </p>
             <ul class="strip__bullets" data-motion-child>
               <li><span class="strip__chip strip__chip--cc">CC</span> Claude Code JSONL</li>
               <li><span class="strip__chip strip__chip--cx">CX</span> Codex CLI rollouts</li>
+              <li><span class="strip__chip strip__chip--gm">GM</span> Gemini CLI chats</li>
             </ul>
           </div>
           <figure class="strip__visual" data-motion-child>
@@ -239,9 +241,10 @@
               </header>
               <div class="snap__body">
                 <div class="snap__row is-active" data-src="cc">▌ <span class="snap__sum">auth-rework</span><br/><span class="snap__chip-cc">[Claude]</span> <span class="snap__rest">1m ago · 355 msgs</span></div>
+                <div class="snap__row" data-src="gm">  <span class="snap__sum">vertex-ai-spike</span><br/><span class="snap__chip-gm">[Gemini]</span> <span class="snap__rest">2h ago · 41 msgs</span></div>
                 <div class="snap__row" data-src="cc">  <span class="snap__sum">ink-renderer-bug</span><br/><span class="snap__chip-cc">[Claude]</span> <span class="snap__rest">3h ago · 124 msgs</span></div>
                 <div class="snap__row" data-src="cx">  <span class="snap__sum">sql-migrations</span><br/><span class="snap__chip-cx">[Codex]</span> <span class="snap__rest">yesterday · 89 msgs</span></div>
-                <div class="snap__row" data-src="cc">  <span class="snap__sum">type-narrowing</span><br/><span class="snap__chip-cc">[Claude]</span> <span class="snap__rest">2d · 47 msgs</span></div>
+                <div class="snap__row" data-src="gm">  <span class="snap__sum">long-context-eval</span><br/><span class="snap__chip-gm">[Gemini]</span> <span class="snap__rest">2d · 96 msgs</span></div>
                 <div class="snap__row" data-src="cx">  <span class="snap__sum">landing-page-design</span><br/><span class="snap__chip-cx">[Codex]</span> <span class="snap__rest">2d · 73 msgs</span></div>
               </div>
             </div>
@@ -305,9 +308,9 @@
             </h2>
             <p class="strip__body" data-motion-child>
               Cursor on any message, press <kbd>⏎</kbd> twice. openctx writes a
-              fresh JSONL truncated at the cut, then runs <code>claude --resume</code>
-              (or <code>codex resume</code>) with your edit pre-filled via PTY
-              bracketed paste.
+              fresh JSONL truncated at the cut, then runs <code>claude --resume</code>,
+              <code>codex resume</code>, or <code>gemini -r</code> with your edit
+              pre-filled via PTY bracketed paste.
             </p>
             <ul class="strip__bullets" data-motion-child>
               <li>Same terminal, or a new window (macOS)</li>
@@ -353,7 +356,7 @@
             <span class="faq__chev" aria-hidden="true">+</span>
           </summary>
           <div class="faq__a">
-            <p>No. openctx is a local-only TUI. It reads the JSONL files Claude Code and Codex CLI already wrote to <code>~/.claude/projects/</code> and <code>~/.codex/sessions/</code>. Nothing is uploaded, indexed remotely, or phoned home.</p>
+            <p>No. openctx is a local-only TUI. It reads the JSONL files Claude Code, Codex, and Gemini CLI already wrote to <code>~/.claude/projects/</code>, <code>~/.codex/sessions/</code>, and <code>~/.gemini/tmp/</code>. Nothing is uploaded, indexed remotely, or phoned home.</p>
           </div>
         </details>
         <details data-reveal>
@@ -362,7 +365,7 @@
             <span class="faq__chev" aria-hidden="true">+</span>
           </summary>
           <div class="faq__a">
-            <p>For Claude Code, openctx writes a fresh JSONL beside the original (new UUID, same project) containing the entries up to your cut point, then runs <code>claude --resume &lt;new-uuid&gt;</code>. If the cut is a user message, that text is pre-filled into Claude's input via PTY bracketed paste. For Codex, <code>codex resume &lt;session-id&gt;</code> picks the transcript up whole.</p>
+            <p>For Claude Code, openctx writes a fresh JSONL beside the original (new UUID, same project) up to your cut point, then runs <code>claude --resume &lt;new-uuid&gt;</code>. For Codex and Gemini — whose CLIs only expose a whole-session resume — openctx slices the transcript itself, drops the fork next to the source file, and launches <code>codex resume &lt;new-id&gt;</code> or <code>gemini -r &lt;new-id&gt;</code> from the recorded project root. If the cut is a user message, that text is pre-filled into the new CLI's input via PTY bracketed paste.</p>
           </div>
         </details>
         <details data-reveal>
