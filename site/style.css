@@ -1475,6 +1475,10 @@ em {
   .tui__panes { grid-template-columns: 1fr; gap: 14px; min-height: 0; }
   .pane { min-height: 0; }
   .pane--list { max-height: 220px; }
+  /* Lock preview height so autopilot session-switches + search/continue
+     overlay toggles don't make the pane (and the whole page below it)
+     jump up and down. Content overflow is clipped by .pane__body. */
+  .pane--preview { height: 360px; }
   .pane__title { font-size: 10.5px; }
   .pane__featurebar { gap: 16px; font-size: 11.5px; }
   .msg__header { font-size: 12px; flex-wrap: wrap; }
