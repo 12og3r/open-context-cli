@@ -78,16 +78,21 @@ if (process.argv[2] === "__launch") {
     process.exit(2);
   }
   const { consumeLaunchSpec } = await import("./lib/launch-spec.ts");
-  const { runPty } = await import("./lib/continue-pty.ts");
+  const { runPty, ptyTuningFor } = await import("./lib/continue-pty.ts");
   try {
     const spec = await consumeLaunchSpec(specPath);
     if (spec.env) {
       for (const [k, v] of Object.entries(spec.env)) process.env[k] = v;
     }
+    // PTY readiness tuning is derived from the executable name rather than
+    // serialized in the spec — RegExp doesn't survive JSON, and per-CLI
+    // tuning is centralized in ptyTuningFor so both the reuse-current path
+    // (in continue-launch-*.ts) and this new-window path agree.
     const code = await runPty({
       cwd: spec.cwd,
       command: spec.command,
       prefillText: spec.prefillText,
+      ...ptyTuningFor(spec.command.exe),
     });
     process.exit(code);
   } catch (e) {

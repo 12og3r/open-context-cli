@@ -15,6 +15,52 @@ export interface PtyRunSpec {
   cwd: string;
   command: LaunchCommand;
   prefillText?: string;
+  // Optional pattern in the child's PTY output that marks "TUI has mounted
+  // and the input box is about to render." The first match starts an idle
+  // timer (300ms by default); inject fires when the stream falls quiet.
+  //
+  // Defaults to claude's alt-screen-enter sequence so existing claude/codex
+  // call sites are unchanged. Gemini doesn't emit alt-screen, so its launcher
+  // passes a different pattern (the OSC title bar's "Ready" status string).
+  readinessPattern?: RegExp;
+  // Cap on how long we'll wait after the first chunk before injecting
+  // anyway. Provider-specific because their startup latencies differ —
+  // claude takes ~1.5s, gemini ~4s. Defaults to 5000ms (claude-tuned).
+  hardDeadlineMs?: number;
+}
+
+// Per-CLI PTY readiness tuning. Centralized so both the reuse-current and
+// new-window launch paths agree on when to inject prefill text — the
+// new-window path goes through `openctx __launch`, which only knows the
+// command name, so it must derive these from the executable instead of
+// having them passed in from the caller.
+export function ptyTuningFor(exe: string): { readinessPattern?: RegExp; hardDeadlineMs?: number } {
+  if (exe === "gemini") {
+    // Gemini's Ink UI sets an OSC title `\x1b]0;◇  Ready (cwd)\x07` once
+    // the input box is about to paint (~3.8s after spawn, ~300ms before
+    // the placeholder text appears). Reliably emitted across runs in our
+    // PTY probe. 2500ms hard-deadline fallback matches the observed worst
+    // case before the title appears.
+    return { readinessPattern: /\x1b\]0;[^\x07]*Ready\b/, hardDeadlineMs: 2500 };
+  }
+  if (exe === "codex") {
+    // Codex's first sync-output frame (\x1b[?2026h ... \x1b[?2026l) wraps
+    // the initial layout pass but finishes ~500ms after spawn — before
+    // codex's input handler is actually ready to receive bracketed paste.
+    // Injecting at that point silently drops the prefill (the brackets
+    // reach codex but its TUI never displays the text).
+    //
+    // We don't have a reliable "input handler armed" signal, so we fall
+    // back to a fixed hard deadline. 2500ms is empirically late enough
+    // for codex to be accepting paste while still feeling much snappier
+    // than the previous claude-tuned 5000ms default. No readinessPattern
+    // here — the alt-screen default never matches codex's output, which
+    // means the inject only fires on hardDeadlineMs and timing stays
+    // predictable across terminals.
+    return { hardDeadlineMs: 2500 };
+  }
+  // claude falls back to the runPty defaults (alt-screen + 5s).
+  return {};
 }
 
 const debug = (s: string) => trace("pty", s);
@@ -95,23 +141,29 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
     child.write(PASTE_START + spec.prefillText + PASTE_END);
   };
 
-  // Inject the bracketed paste once claude's TUI is actually mounted. We
-  // watch for `\x1b[?1049h` — the "switch to alternate screen" sequence
-  // that claude emits right before painting its TUI. Idle detection only
-  // starts AFTER that, so we don't inject during the terminal capability
-  // negotiation phase (where the input box doesn't exist yet).
+  // Inject the bracketed paste once the child's TUI is actually mounted.
+  // The default pattern — `\x1b[?1049h` — is claude's "switch to alternate
+  // screen" sequence, which it emits right before painting its TUI. Idle
+  // detection only starts AFTER the first match, so we don't inject during
+  // the terminal capability negotiation phase (where the input box doesn't
+  // exist yet).
   //
-  // Sequence on a real run looks roughly like:
+  // Sequence on a real claude run looks roughly like:
   //   t=0       chunk #1  cursor save/restore + show cursor
   //   t=6ms     chunk #3  \x1b[?2004h (paste mode on)  ← paste mode IS on
   //   t=320ms   <silence — looks "idle" but claude hasn't mounted yet>
   //   t=1550ms  chunk #7  \x1b[?1049h (enter alt screen)  ← TUI mount
   //   t=1580ms  chunk #8+ session content rendered
   //   t=~1900ms idle settles → safe to inject
+  //
+  // Gemini's mount signature is different — it sets an OSC title containing
+  // "Ready" once its Ink UI is hydrated and the input box is about to paint,
+  // so the gemini launcher passes that as its readinessPattern.
   const IDLE_MS = 300;
-  const HARD_DEADLINE_MS = 5000;
+  const HARD_DEADLINE_MS = spec.hardDeadlineMs ?? 5000;
+  const READINESS_PATTERN = spec.readinessPattern ?? /\x1b\[\?1049h/;
   let firstChunkAt = 0;
-  let altScreenAt = 0;
+  let readyAt = 0;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
   let chunkCount = 0;
@@ -125,15 +177,15 @@ export async function runPty(spec: PtyRunSpec): Promise<number> {
         deadlineTimer = setTimeout(() => inject("hard deadline"), HARD_DEADLINE_MS);
       }
     }
-    if (altScreenAt === 0 && data.includes("\x1b[?1049h")) {
-      altScreenAt = Date.now();
-      debug(`alt-screen-enter at chunk #${chunkCount} (${altScreenAt - firstChunkAt}ms)`);
+    if (readyAt === 0 && READINESS_PATTERN.test(data)) {
+      readyAt = Date.now();
+      debug(`tui-ready at chunk #${chunkCount} (${readyAt - firstChunkAt}ms)`);
     }
     process.stdout.write(data);
 
-    if (spec.prefillText && !injected && altScreenAt !== 0) {
+    if (spec.prefillText && !injected && readyAt !== 0) {
       if (idleTimer) clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => inject("idle after alt-screen"), IDLE_MS);
+      idleTimer = setTimeout(() => inject("idle after tui-ready"), IDLE_MS);
     }
   });
 

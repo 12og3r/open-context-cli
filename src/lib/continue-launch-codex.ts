@@ -7,7 +7,7 @@ import type { ContinueRequest } from "./continue-types.ts";
 import type { ContinueResult } from "./continue-launch.ts";
 import { codexSessionsDir } from "./codex-paths.ts";
 import { forkCodexSession } from "./continue-fork-codex.ts";
-import { runPty } from "./continue-pty.ts";
+import { ptyTuningFor, runPty } from "./continue-pty.ts";
 import { spawnNewWindow } from "./continue-spawn.ts";
 import { trace } from "./debug-trace.ts";
 
@@ -69,7 +69,12 @@ export async function executeContinueCodex(req: ContinueRequest): Promise<Contin
 
   if (req.launchMode === "reuse-current") {
     try {
-      const code = await runPty({ cwd, command, prefillText: req.userText });
+      const code = await runPty({
+        cwd,
+        command,
+        prefillText: req.userText,
+        ...ptyTuningFor(command.exe),
+      });
       return { ok: true, childExitCode: code };
     } catch (e) {
       await silentRemove(dstPath);
