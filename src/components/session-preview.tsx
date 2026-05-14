@@ -22,11 +22,11 @@ const EMPTY_BUFFER: ConversationBuffer = { lines: [], startLine: [], endLine: []
 // memory unboundedly on long sessions.
 const BUFFER_CACHE_MAX = 8;
 
-// Module-scoped LRU so the cache survives SessionPreview unmount/remount
-// — which the parent triggers every time detail.status flips through
-// "loading" on a fresh session load. A useRef-based cache would lose all
-// entries on that remount, defeating the point of caching at all when the
-// user pages between visited + unvisited sessions.
+// Module-scoped LRU so the cache survives any future change to the parent's
+// mount strategy. Today SessionPreview stays mounted across detail loading
+// (so its useInput keeps processing ↓/↑ keystrokes while the next session
+// streams in), but a useRef-based cache would be a footgun if the parent
+// ever started unmounting again.
 //
 // Insertion order is LRU: the render effect deletes-then-sets so a freshly
 // committed buffer moves to the tail, and the session-change effect does
@@ -47,6 +47,7 @@ function bufferCacheKey(sessionId: string | null, width: number, lang: string, e
 }
 
 export function SessionPreview({
+  detailStatus = "ready",
   messages,
   sessionId,
   source = null,
@@ -58,6 +59,11 @@ export function SessionPreview({
   onRequestContinue,
   onContinueOpenChange,
 }: {
+  // Whether the parent is still streaming the session detail. When "loading"
+  // we short-circuit to the spinner branch rather than fall through to the
+  // "(no messages)" placeholder — visibleMessages is [] during loading, which
+  // is structurally identical to a truly empty session.
+  detailStatus?: "loading" | "ready";
   messages: Message[];
   sessionId: string | null;
   source?: Source | null;
@@ -151,12 +157,12 @@ export function SessionPreview({
     lastAnchorRef.current = null;
     // Try to restore a previously-built buffer for this session so jumping
     // through the list doesn't trigger the "rendering…" spinner every time.
-    // On cache miss we deliberately keep the previous buffer on screen
-    // until the render-effect commits a fresh one — flashing stale content
-    // for a tick is preferable to dropping into the spinner every nav, and
-    // the previous-buffer's text is fully replaced the moment the new
-    // render finishes. We only fall through to EMPTY_BUFFER on the very
-    // first mount when no prior render has happened.
+    // On cache miss we wipe to EMPTY_BUFFER so the spinner shows
+    // immediately — predictable "loading next" feedback is better than
+    // briefly flashing the previous session's content under the new
+    // session's frame, which reads as flicker (especially noticeable on
+    // sessions with sparse content, where the wrong-content frame isn't
+    // visually swallowed by the new content that follows).
     const cacheKey = bufferCacheKey(sessionId, width, lang, emoji);
     const cached = bufferCache.get(cacheKey);
     if (cached) {
@@ -165,10 +171,9 @@ export function SessionPreview({
       bufferCache.delete(cacheKey);
       bufferCache.set(cacheKey, cached);
       setBuffer(cached);
+    } else {
+      setBuffer(EMPTY_BUFFER);
     }
-    // No cache → leave buffer alone. If this is the first mount the
-    // initial state is already EMPTY_BUFFER and the spinner shows; otherwise
-    // the previous session's buffer stays until the new render commits.
   }, [sessionId, width, lang, emoji]);
 
   const lastIdx = Math.max(0, messages.length - 1);
@@ -515,6 +520,22 @@ export function SessionPreview({
       });
     }
   });
+
+  // While the parent is still streaming this session's detail, visibleMessages
+  // is []. We can't reuse the "(no messages)" placeholder here — that branch
+  // is for sessions whose JSONL really is empty, and falling through to it
+  // during a load would briefly flash the placeholder before the streamed
+  // messages arrive. Show the loading-session spinner instead.
+  if (detailStatus === "loading") {
+    return (
+      <Box width={width} height={height} alignItems="center" justifyContent="center">
+        <Box>
+          <Text color="cyan"><Spinner /></Text>
+          <Text dimColor> {t(lang, "loading.messages")}</Text>
+        </Box>
+      </Box>
+    );
+  }
 
   if (messages.length === 0) {
     return (

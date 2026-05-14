@@ -4,7 +4,6 @@ import fsSync from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { Box, Text, useInput, useStdout } from "ink";
-import Spinner from "ink-spinner";
 import type { SessionMeta } from "../providers/types.ts";
 import { getProviderForSource } from "../providers/index.ts";
 import type { ContinueRequest } from "../lib/continue-types.ts";
@@ -321,29 +320,29 @@ export function SessionBrowser({
               width={rightInnerWidth}
               height={innerHeight}
             />
+          ) : detail.status === "error" ? (
+            <Text color="red">! {detail.error.message}</Text>
           ) : (
+            // SessionPreview is always rendered (loading or ready). Unmounting
+            // it during a detail load was tearing down its useInput, so any
+            // ↓/↑ pressed while focus was on the preview pane got dropped on
+            // the floor until the load completed. Keeping it mounted lets
+            // its key handlers stay live across the load, and the preview
+            // itself decides whether to show the "loading session" spinner
+            // (via the detailStatus prop) or the rendered conversation.
             <>
-              {detail.status === "loading" && (
-                <Box>
-                  <Text color={ACCENT}><Spinner /></Text>
-                  <Text dimColor> {t(lang, "loading.messages")}</Text>
-                </Box>
-              )}
-              {detail.status === "error" && (
-                <Text color="red">! {detail.error.message}</Text>
-              )}
-              {detail.status === "ready" && (
-                <SessionPreview
-                  messages={visibleMessages}
-                  sessionId={selected?.id ?? null}
-                  source={selected?.source ?? null}
-                  focused={previewFocused}
-                  height={innerHeight}
-                  width={rightInnerWidth}
-                  emoji={emoji}
-                  showHash={settings.showHash}
-                  onContinueOpenChange={setPreviewContinueOpen}
-                  onRequestContinue={(info) => {
+              <SessionPreview
+                detailStatus={detail.status}
+                messages={visibleMessages}
+                sessionId={selected?.id ?? null}
+                source={selected?.source ?? null}
+                focused={previewFocused}
+                height={innerHeight}
+                width={rightInnerWidth}
+                emoji={emoji}
+                showHash={settings.showHash}
+                onContinueOpenChange={setPreviewContinueOpen}
+                onRequestContinue={(info) => {
                     if (!selected || !onRequestContinue) return { ok: true };
 
                     // Pre-flight checks done while Ink is still up so we can
@@ -416,8 +415,7 @@ export function SessionBrowser({
                     });
                     return { ok: true };
                   }}
-                />
-              )}
+              />
             </>
           )}
         </Pane>
