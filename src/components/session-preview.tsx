@@ -17,6 +17,15 @@ import { sourceChipLabel } from "./session-list.tsx";
 
 const EMPTY_BUFFER: ConversationBuffer = { lines: [], startLine: [], endLine: [], matches: [] };
 
+// Number of (sessionId, width, lang) buffer entries to keep cached. Eight
+// is enough to cover a typical "rummage through recent sessions" flow
+// without growing memory unboundedly on long sessions.
+const BUFFER_CACHE_MAX = 8;
+
+function bufferCacheKey(sessionId: string | null, width: number, lang: string): string {
+  return `${sessionId ?? ""}|${width}|${lang}`;
+}
+
 export function SessionPreview({
   messages,
   sessionId,
@@ -120,10 +129,27 @@ export function SessionPreview({
     setForceMode(false);
     lastInitKey.current = null;
     lastAnchorRef.current = null;
-    // Wipe the buffer so the spinner shows for the new session, instead of
-    // flashing the previous session's content while the new render is in flight.
-    setBuffer(EMPTY_BUFFER);
-  }, [sessionId]);
+    // Try to restore a previously-built buffer for this session so jumping
+    // through the list doesn't trigger the "rendering…" spinner every time.
+    // On cache miss we deliberately keep the previous buffer on screen
+    // until the render-effect commits a fresh one — flashing stale content
+    // for a tick is preferable to dropping into the spinner every nav, and
+    // the previous-buffer's text is fully replaced the moment the new
+    // render finishes. We only fall through to EMPTY_BUFFER on the very
+    // first mount when no prior render has happened.
+    const cacheKey = bufferCacheKey(sessionId, width, lang);
+    const cached = bufferCacheRef.current.get(cacheKey);
+    if (cached) {
+      // LRU touch: re-inserting moves the entry to the tail of the Map
+      // iteration order so eviction targets the truly oldest entry.
+      bufferCacheRef.current.delete(cacheKey);
+      bufferCacheRef.current.set(cacheKey, cached);
+      setBuffer(cached);
+    }
+    // No cache → leave buffer alone. If this is the first mount the
+    // initial state is already EMPTY_BUFFER and the spinner shows; otherwise
+    // the previous session's buffer stays until the new render commits.
+  }, [sessionId, width, lang]);
 
   const lastIdx = Math.max(0, messages.length - 1);
   // The search row is visible while the user is typing (searchOpen) AND
@@ -151,6 +177,13 @@ export function SessionPreview({
   // (buffer === EMPTY_BUFFER) shows the spinner.
   const [buffer, setBuffer] = useState<ConversationBuffer>(EMPTY_BUFFER);
 
+  // Cache the rendered buffer keyed on (sessionId, width, lang) so revisiting
+  // a session in the same layout is instant — no spinner, no re-pass through
+  // markdown→ANSI. We only cache the "clean" buffer (no in-flight search /
+  // expanded-tool state) so a stale render doesn't clobber an active query;
+  // the render-effect rebuilds when those inputs change.
+  const bufferCacheRef = useRef<Map<string, ConversationBuffer>>(new Map());
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -162,13 +195,26 @@ export function SessionPreview({
         );
         if (cancelled) return;
         setBuffer(result);
+        // Only cache the clean-state render — a buffer captured mid-search
+        // would re-display match highlights from a query the user dismissed.
+        if (sessionId && !query && matchIndex < 0 && expanded.size === 0) {
+          const cache = bufferCacheRef.current;
+          const cacheKey = bufferCacheKey(sessionId, width, lang);
+          cache.delete(cacheKey);
+          cache.set(cacheKey, result);
+          while (cache.size > BUFFER_CACHE_MAX) {
+            const oldest = cache.keys().next().value;
+            if (oldest === undefined) break;
+            cache.delete(oldest);
+          }
+        }
       } catch (err) {
         if (err instanceof CancelledError) return;
         throw err;
       }
     })();
     return () => { cancelled = true; };
-  }, [messages, width, expanded, emoji, query, matchIndex, lang]);
+  }, [messages, width, expanded, emoji, query, matchIndex, lang, sessionId]);
 
   const matches = buffer.matches;
   const matchCount = matches.length;
