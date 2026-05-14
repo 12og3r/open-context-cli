@@ -708,22 +708,30 @@ em {
 
 /* search-match highlights — matched items get an underline; the currently-
    focused match is red. Used both by the live auto-pilot search and by the
-   static .snap__msg-body in the features section. */
+   static .snap__msg-body in the features section.
+   NB: declare longhand props only — mixing `text-decoration: underline`
+   shorthand with `text-decoration-color` / `-thickness` longhand in the same
+   rule causes the longhand values to be ignored on iOS Safari. */
 .msg__body mark,
 .snap__msg-body mark {
   background: transparent;
   color: inherit;
   padding: 0;
   border-radius: 0;
-  text-decoration: underline;
+  text-decoration-line: underline;
+  text-decoration-style: solid;
   text-decoration-color: var(--t-fg-dim);
-  text-decoration-thickness: 1px;
+  -webkit-text-decoration-line: underline;
+  -webkit-text-decoration-style: solid;
+  -webkit-text-decoration-color: var(--t-fg-dim);
+  text-decoration-thickness: 1.5px;
   text-underline-offset: 3px;
 }
 .msg__body mark.is-current,
 .snap__msg-body mark.is-current {
   color: #FF5F4D;
   text-decoration-color: #FF5F4D;
+  -webkit-text-decoration-color: #FF5F4D;
   font-weight: 500;
 }
 
@@ -1446,10 +1454,9 @@ em {
   .hero__tagline { font-size: clamp(28px, 11vw, 44px); margin-bottom: 16px; }
   .hero__sub { font-size: 14.5px; margin-bottom: 24px; }
   .hero__copy { margin-bottom: 20px; }
-  /* install pill on phone: tighter, scope hidden, allow wrap */
+  /* install pill on phone: tighter, allow wrap */
   .install { padding: 11px 6px 11px 14px; font-size: 11.5px; border-radius: 14px; gap: 10px; flex-wrap: wrap; row-gap: 6px; }
   .install__cmd { font-size: 11.5px; }
-  .install__scope { display: none; }
   .install__sep { display: none; }
   .install__action { padding: 6px 11px; font-size: 11px; margin-left: auto; }
   .install .icon-copy, .install .icon-check { width: 13px; height: 13px; }
