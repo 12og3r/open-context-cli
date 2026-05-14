@@ -141,7 +141,12 @@ async function readMeta(filePath: string): Promise<SessionMeta | null> {
     id = match ? match[1]! : base;
   }
 
-  const summary = firstUserText || firstAssistantText || "(empty session)";
+  const summary = firstUserText || firstAssistantText;
+  // Codex rollout files can land on disk before the user actually sends
+  // anything (e.g. CLI launched, exited without a prompt). Those show
+  // up as "0 msgs" entries with no identifying summary; filter them
+  // rather than surfacing the "(empty session)" placeholder.
+  if (!summary) return null;
 
   return {
     id,

@@ -231,8 +231,14 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
   }
 
   if (!summary) {
-    summary = firstUserText || firstAssistantText || "(empty session)";
+    summary = firstUserText || firstAssistantText;
   }
+  // Gemini CLI writes a session file as soon as it launches — bootstrap
+  // metadata only, no user/gemini messages. Those files would show up
+  // here as "0 msgs" entries with no identifying summary; filter them
+  // rather than surfacing the "(empty session)" placeholder, since
+  // they're not conversations the user can do anything with.
+  if (!summary) return null;
 
   const cwd = directoriesFirst || projectPath;
   return {

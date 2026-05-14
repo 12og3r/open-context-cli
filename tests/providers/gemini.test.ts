@@ -63,11 +63,12 @@ describe("GeminiProvider.listSessions", () => {
   test("returns one SessionMeta per session-*.jsonl, aggregating across projects", async () => {
     const root = await makeRoot();
     const list = await new GeminiProvider().listSessions(root);
-    // Project foo: basic + with-tools + with-rewind + empty + malformed = 5
-    // (subagent kind is filtered out).
+    // Project foo: basic + with-tools + with-rewind + malformed = 4
+    // (subagent kind is filtered out, and the bootstrap-only empty
+    // fixture is filtered out too — see "(empty session) filter" below).
     // Project bar: 1.
-    // Total: 6.
-    expect(list).toHaveLength(6);
+    // Total: 5.
+    expect(list).toHaveLength(5);
     expect(list.every(m => m.source === "gemini")).toBe(true);
   });
 
@@ -130,12 +131,15 @@ describe("GeminiProvider.listSessions", () => {
     expect(tools.messageCounts).toEqual({ concise: 2, full: 4 });
   });
 
-  test("empty session falls back to the (empty session) sentinel", async () => {
+  test("bootstrap-only sessions with no derivable summary are filtered out", async () => {
+    // Gemini CLI writes a session file the moment it launches, before the
+    // user has typed anything. Those files show up here with zero
+    // surviving message records and no `summary` patch — they'd surface
+    // as "(empty session) · 0 msgs" entries that the user can't do
+    // anything with, so we drop them at the metadata layer.
     const root = await makeRoot();
     const list = await new GeminiProvider().listSessions(root);
-    const empty = list.find(m => m.id === "019e10b0-4444-4000-8000-aaa000000004")!;
-    expect(empty.summary).toBe("(empty session)");
-    expect(empty.messageCounts).toEqual({ concise: 0, full: 0 });
+    expect(list.find(m => m.id === "019e10b0-4444-4000-8000-aaa000000004")).toBeUndefined();
   });
 
   test("malformed JSON lines are skipped without aborting the file", async () => {

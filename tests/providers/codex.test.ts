@@ -34,7 +34,9 @@ describe("CodexProvider.listSessions", () => {
   test("returns metadata for every rollout-*.jsonl in the date tree", async () => {
     const root = await makeRoot();
     const list = await new CodexProvider().listSessions(root);
-    expect(list).toHaveLength(4);
+    // basic + with-tools + malformed = 3. The empty fixture is filtered
+    // out by readMeta — see "(empty session) filter" below.
+    expect(list).toHaveLength(3);
     expect(list.every(m => m.source === "codex")).toBe(true);
   });
 
@@ -53,12 +55,14 @@ describe("CodexProvider.listSessions", () => {
     expect(basic.summary).toBe("hello there codex");
   });
 
-  test("empty session falls back to the (empty session) sentinel", async () => {
+  test("sessions with no derivable summary are filtered out", async () => {
+    // Rollouts that landed on disk before any user/assistant message
+    // showed up have no firstUserText / firstAssistantText to derive a
+    // summary from. We'd otherwise label them "(empty session) · 0 msgs"
+    // and leave the user with nothing to do — filter at readMeta instead.
     const root = await makeRoot();
     const list = await new CodexProvider().listSessions(root);
-    const empty = list.find(m => m.id === "019e10c0-2222-7000-aaaa-000000000002")!;
-    expect(empty.summary).toBe("(empty session)");
-    expect(empty.messageCounts).toEqual({ concise: 0, full: 0 });
+    expect(list.find(m => m.id === "019e10c0-2222-7000-aaaa-000000000002")).toBeUndefined();
   });
 
   test("returns empty list when the codex root doesn't exist", async () => {

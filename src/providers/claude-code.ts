@@ -176,8 +176,12 @@ async function readMeta(filePath: string, projectPath: string): Promise<SessionM
     || customTitle
     || firstUserText
     || firstTaskSubject
-    || latestSlug
-    || "(empty session)";
+    || latestSlug;
+  // Sessions with no derivable summary — no `summary`/`custom-title`
+  // entries, no user/assistant content, no `slug` field — would show
+  // up as "0 msgs" entries with no identifying text. Filter them out
+  // rather than surfacing the "(empty session)" placeholder.
+  if (!summary) return null;
 
   return {
     id,

@@ -32,12 +32,26 @@ describe("ClaudeCodeProvider.listSessions", () => {
     const root = await makeRoot();
     const provider = new ClaudeCodeProvider();
     const list = await provider.listSessions(root);
-    expect(list).toHaveLength(8);
+    // empty.jsonl is filtered out at readMeta (see "(empty session) filter"
+    // test below), so the visible count is 7, not 8.
+    expect(list).toHaveLength(7);
     const byName = Object.fromEntries(list.map(m => [path.basename(m.filePath), m]));
     expect(byName["with-summary.jsonl"]!.summary).toBe("Building Ink TUI app");
     expect(byName["without-summary.jsonl"]!.summary).toContain("first user message");
-    expect(byName["empty.jsonl"]!.summary).toBe("(empty session)");
+    expect(byName["empty.jsonl"]).toBeUndefined();
     expect(byName["malformed.jsonl"]!.summary).toBe("Has a bad line");
+  });
+
+  test("sessions with no derivable summary are filtered out", async () => {
+    // empty.jsonl has no `summary` / `custom-title` entries and no
+    // user/assistant messages, so there's nothing to label it with.
+    // We drop the session at the metadata layer rather than surfacing
+    // the "(empty session)" placeholder, since the user can't do
+    // anything useful with an empty transcript.
+    const root = await makeRoot();
+    const list = await new ClaudeCodeProvider().listSessions(root);
+    const byName = Object.fromEntries(list.map(m => [path.basename(m.filePath), m]));
+    expect(byName["empty.jsonl"]).toBeUndefined();
   });
 
   test("skips slash-command boilerplate when extracting first user text", async () => {
@@ -138,10 +152,12 @@ describe("ClaudeCodeProvider.loadSession", () => {
   });
 
   test("empty file yields zero messages", async () => {
+    // listSessions filters empty.jsonl out (no derivable summary), so we
+    // call loadSession directly against the fixture path — the loader
+    // contract is still that an empty JSONL produces zero messages.
     const root = await makeRoot();
-    const list = await new ClaudeCodeProvider().listSessions(root);
-    const empty = list.find(m => path.basename(m.filePath) === "empty.jsonl")!;
-    const messages = await collect<Message>(new ClaudeCodeProvider().loadSession(empty.filePath));
+    const emptyPath = path.join(root, "-Users-roger-projects-foo", "empty.jsonl");
+    const messages = await collect<Message>(new ClaudeCodeProvider().loadSession(emptyPath));
     expect(messages).toHaveLength(0);
   });
 });
