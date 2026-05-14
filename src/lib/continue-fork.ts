@@ -15,12 +15,14 @@ export interface ForkSpec {
   newCwd?: string;
 }
 
-// Stream the source JSONL, copy contiguous user/assistant entries up to (and
-// possibly including) the entry whose uuid matches targetUuid. Drops
-// summary / custom-title lines so claude regenerates its own metadata for
-// the forked session. Rewrites each entry's sessionId to newSessionId, and
-// optionally each entry's cwd to newCwd. Throws if the target uuid is never
-// seen.
+// Stream the source JSONL, copy entries up to (and possibly including) the
+// entry whose uuid matches targetUuid. Drops only `summary` / `custom-title`
+// (metadata that claude regenerates for the forked session) — everything
+// else, including `system` / `attachment` / `last-prompt` /
+// `file-history-snapshot` / `queue-operation`, is preserved so the
+// parentUuid chain claude --resume walks from the tail stays intact.
+// Rewrites each entry's sessionId to newSessionId, and optionally each
+// entry's cwd to newCwd. Throws if the target uuid is never seen.
 export async function forkSession(spec: ForkSpec): Promise<void> {
   const { srcPath, dstPath, targetUuid, targetRole, newSessionId, newCwd } = spec;
   const lines: string[] = [];
@@ -41,7 +43,7 @@ export async function forkSession(spec: ForkSpec): Promise<void> {
     let entry: Record<string, unknown>;
     try { entry = JSON.parse(line) as Record<string, unknown>; } catch { continue; }
     const type = entry.type;
-    if (type !== "user" && type !== "assistant") continue;
+    if (type === "summary" || type === "custom-title") continue;
 
     const isTarget = typeof entry.uuid === "string" && entry.uuid === targetUuid;
     if (isTarget) {

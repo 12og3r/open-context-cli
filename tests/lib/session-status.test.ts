@@ -11,7 +11,7 @@ function meta(id: string, source: "claude-code" | "codex"): SessionMeta {
     summary: id,
     projectPath: "/p",
     modifiedAt: NOW,
-    messageCount: 1,
+    messageCounts: { concise: 1, full: 1 },
     source,
   };
 }

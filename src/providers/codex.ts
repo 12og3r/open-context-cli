@@ -86,9 +86,11 @@ async function readMeta(filePath: string): Promise<SessionMeta | null> {
 
   let id = "";
   let recordedCwd = "";
-  let messageCount = 0;
+  let conciseCount = 0;
+  let fullCount = 0;
   let firstUserText = "";
   let firstAssistantText = "";
+  let entryIndex = 0;
 
   const rl = readline.createInterface({
     input: createReadStream(filePath, { encoding: "utf-8" }),
@@ -100,25 +102,34 @@ async function readMeta(filePath: string): Promise<SessionMeta | null> {
     try { entry = JSON.parse(line) as Record<string, unknown>; } catch { continue; }
     const type = entry.type;
     const payload = entry.payload as Record<string, unknown> | undefined;
-    if (!payload) continue;
 
-    if (type === "session_meta") {
+    if (type === "session_meta" && payload) {
       if (typeof payload.id === "string" && !id) id = payload.id;
       if (typeof payload.cwd === "string" && !recordedCwd) recordedCwd = payload.cwd;
+      entryIndex += 1;
       continue;
     }
-    if (type !== "response_item") continue;
-    if (payload.type !== "message") continue;
-    const role = payload.role;
-    if (role !== "user" && role !== "assistant") continue;
 
-    messageCount += 1;
-    if (role === "user" && !firstUserText) {
-      firstUserText = cleanBoilerplate(joinTextParts(payload.content));
+    // Count what the preview will actually render: messagesFromEntry drops
+    // boilerplate-only user turns and turn-context noise the same way the
+    // preview does, so concise/full counts here match what the user sees
+    // when they open the session.
+    const fanned = messagesFromEntry(entry, entryIndex);
+    fullCount += fanned.length;
+    for (const m of fanned) {
+      if (m.role === "user" || m.role === "assistant") conciseCount += 1;
     }
-    if (role === "assistant" && !firstAssistantText) {
-      firstAssistantText = (joinTextParts(payload.content).split("\n")[0] ?? "").trim();
+
+    if (payload && type === "response_item" && payload.type === "message") {
+      const role = payload.role;
+      if (role === "user" && !firstUserText) {
+        firstUserText = cleanBoilerplate(joinTextParts(payload.content));
+      }
+      if (role === "assistant" && !firstAssistantText) {
+        firstAssistantText = (joinTextParts(payload.content).split("\n")[0] ?? "").trim();
+      }
     }
+    entryIndex += 1;
   }
 
   if (!id) {
@@ -138,7 +149,7 @@ async function readMeta(filePath: string): Promise<SessionMeta | null> {
     summary,
     projectPath: recordedCwd,
     modifiedAt: stat.mtime,
-    messageCount,
+    messageCounts: { concise: conciseCount, full: fullCount },
     cwd: recordedCwd || undefined,
     source: "codex",
   };

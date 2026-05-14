@@ -67,12 +67,17 @@ describe("ClaudeCodeProvider.listSessions", () => {
     expect(list.every(m => m.projectPath === "/Users/roger/projects/foo")).toBe(true);
   });
 
-  test("counts user+assistant lines only", async () => {
+  test("messageCounts track concise vs full preview counts", async () => {
     const root = await makeRoot();
     const list = await new ClaudeCodeProvider().listSessions(root);
     const tools = list.find(m => path.basename(m.filePath) === "with-tools.jsonl")!;
-    // user + assistant (the tool_result is wrapped in a user line per Claude Code)
-    expect(tools.messageCount).toBe(3);
+    // with-tools.jsonl: 1 user (text) + 1 assistant (text + tool_use) +
+    // 1 user (tool_result only). The preview fans these into
+    // user/assistant/tool_use/tool_result rows in full mode (4); concise
+    // mode keeps only user/assistant rows (2 — the tool_result entry
+    // produces no user row because it has no text).
+    expect(tools.messageCounts.full).toBe(4);
+    expect(tools.messageCounts.concise).toBe(2);
   });
 
   test("captures cwd from the first user/assistant entry", async () => {

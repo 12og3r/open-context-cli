@@ -20,7 +20,11 @@ export interface SessionMeta {
   summary: string;       // jsonl summary line, or first user message, or "(empty session)"
   projectPath: string;   // decoded from parent dir; "" when not derivable
   modifiedAt: Date;
-  messageCount: number;  // count of user+assistant lines (other types don't count)
+  // Both display-mode counts, sized to match what the preview pane shows
+  // under each mode. `concise` = user+assistant Message rows (text only).
+  // `full` = every row the preview renders, including tool_use / tool_result
+  // / system. The list picks one based on the user's current displayMode.
+  messageCounts: { concise: number; full: number };
   cwd?: string;          // exact cwd from the first user/assistant entry's
                          // `cwd` field — preferred over decoding the slug,
                          // which is lossy when path segments contain "-".
