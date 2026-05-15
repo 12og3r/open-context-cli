@@ -37,7 +37,7 @@ const en: StringTable = {
   "search.no_matches": "no matches",
 
   // Settings panel
-  "settings.help": "↑↓ field · ←→ move cursor · ⇥ next sub-field · space to apply · esc back",
+  "settings.help": "space to apply · esc back",
   "settings.display_mode.title": "Display mode",
   "settings.display_mode.concise": "Concise",
   "settings.display_mode.full": "Full",
@@ -132,8 +132,8 @@ const en: StringTable = {
   // Footer hints — pipe-joined strings; one segment per token. Splitting at
   // render time avoids Record<FooterContext,string[]> here, which would force
   // i18n.ts to import a UI type and create a circular dependency.
-  "footer.list":           "↑↓ select|⏎ focus preview|⇥ menu|q quit",
-  "footer.preview":        "↑↓ scroll|esc back|⌃F find|⇥ expand tool|⏎ continue|q quit",
+  "footer.list":           "↑↓ select|⇥ preview|d delete|esc settings|q quit",
+  "footer.preview":        "↑↓ scroll|⇥ sessions|esc settings|⌃F find|⏎ continue|q quit",
   "footer.preview-search": "type to search|⏎ commit|esc cancel",
   "footer.feature-bar":    "←→ pick|⇥ next|⏎ open|esc back",
   "footer.settings":       "↑↓ field|←→ cursor|space apply|⏎ confirm|esc back",
@@ -160,7 +160,7 @@ const zh: StringTable = {
   "filter.label": "筛选",
   "search.no_matches": "无匹配",
 
-  "settings.help": "↑↓ 字段 · ←→ 移动光标 · ⇥ 子字段 · 空格 切换 · esc 返回",
+  "settings.help": "空格 切换 · esc 返回",
   "settings.display_mode.title": "显示模式",
   "settings.display_mode.concise": "精简",
   "settings.display_mode.full": "完整",
@@ -244,8 +244,8 @@ const zh: StringTable = {
   "rt.hours_ago": "{n} 小时前",
   "rt.days_ago": "{n} 天前",
 
-  "footer.list":           "↑↓ 选择|⏎ 进入预览|⇥ 菜单|q 退出",
-  "footer.preview":        "↑↓ 滚动|esc 返回|⌃F 查找|⇥ 展开工具|⏎ 继续对话|q 退出",
+  "footer.list":           "↑↓ 选择|⇥ 预览|d 删除|esc 设置|q 退出",
+  "footer.preview":        "↑↓ 滚动|⇥ 列表|esc 设置|⌃F 查找|⏎ 继续对话|q 退出",
   "footer.preview-search": "输入以搜索|⏎ 确认|esc 取消",
   "footer.feature-bar":    "←→ 选择|⇥ 下一项|⏎ 打开|esc 返回",
   "footer.settings":       "↑↓ 字段|←→ 光标|空格 切换|⏎ 确认|esc 返回",

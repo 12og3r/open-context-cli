@@ -59,7 +59,6 @@ export function SessionBrowser({
   // border with the right pane's left border on this row.
   const FEATURES: FeatureItem[] = [
     { id: "settings", label: t(lang, "feature.settings"), icon: "≡" },
-    { id: "delete", label: t(lang, "feature.delete"), icon: "×" },
   ];
   const { stdout } = useStdout();
   const termWidth = stdout?.columns ?? 100;
@@ -116,7 +115,21 @@ export function SessionBrowser({
     if (input === "q" || (key.ctrl && input === "c")) { onQuit(); return; }
 
     if (focus === "list") {
-      if (key.tab) { setFocus("feature-bar"); return; }
+      if (key.escape) { setFocus("feature-bar"); return; }
+      if (key.tab) {
+        if (rightView !== "preview") setRightView("preview");
+        setFocus("preview");
+        return;
+      }
+      if (input === "d" || input === "D" || key.delete || key.backspace) {
+        if (!selected) return;
+        setDeleteTarget(selected);
+        setDeleteCursor("cancel");
+        setDeleteError(null);
+        setRightView("delete-confirm");
+        setFocus("delete-confirm");
+        return;
+      }
       if (input === "j" || key.downArrow) setSelectedIdx(i => Math.min(sessions.length - 1, i + 1));
       else if (input === "k" || key.upArrow) setSelectedIdx(i => Math.max(0, i - 1));
       else if (key.return || input === "l" || key.rightArrow) {
@@ -131,7 +144,9 @@ export function SessionBrowser({
       // the footer in place and keeps the cursor visible. Stealing it here
       // would also drop focus back to the list.
       if (previewContinueOpen) return;
-      if (key.escape || input === "h" || key.leftArrow) setFocus("list");
+      if (key.tab) { setFocus("list"); return; }
+      if (key.escape) { setFocus("feature-bar"); return; }
+      if (input === "h" || key.leftArrow) setFocus("list");
       return;
     }
 
@@ -151,13 +166,6 @@ export function SessionBrowser({
         if (f?.id === "settings") {
           setRightView("settings");
           setFocus("settings");
-        } else if (f?.id === "delete") {
-          if (!selected) return;
-          setDeleteTarget(selected);
-          setDeleteCursor("cancel");
-          setDeleteError(null);
-          setRightView("delete-confirm");
-          setFocus("delete-confirm");
         }
       }
       return;
@@ -190,7 +198,7 @@ export function SessionBrowser({
 
   function closeDeleteDialog() {
     setRightView("preview");
-    setFocus("feature-bar");
+    setFocus("list");
     setDeleteTarget(null);
     setDeleteError(null);
     setDeleteBusy(false);

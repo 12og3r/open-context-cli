@@ -331,8 +331,8 @@ function renderConversation(session, opts = {}) {
 function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 const FOOTERS = {
-  list:    [['↑↓', 'select'], ['⏎', 'focus preview'], ['⇥', 'menu'], ['q', 'quit']],
-  preview: [['↑↓', 'scroll'], ['esc', 'back'], ['⌃F', 'find'], ['⇥', 'expand tool'], ['⏎', 'continue'], ['q', 'quit']],
+  list:    [['↑↓', 'select'], ['⇥', 'preview'], ['d', 'delete'], ['esc', 'settings'], ['q', 'quit']],
+  preview: [['↑↓', 'scroll'], ['⇥', 'sessions'], ['esc', 'settings'], ['⌃F', 'find'], ['⏎', 'continue'], ['q', 'quit']],
   search:  [['type', 'to search'], ['⏎', 'commit'], ['esc', 'cancel']],
 };
 

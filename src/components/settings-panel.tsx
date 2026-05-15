@@ -190,6 +190,10 @@ export function SettingsPanel({
     [lang, defaultClaudeDir, defaultCodexDir, defaultGeminiDir],
   );
   const [fieldIdx, setFieldIdx] = useState(0);
+  // Scroll-on-edge window over FIELDS. Each field renders at FIELD_ROWS rows
+  // (3 content rows + marginBottom). When the focused field moves out of the
+  // visible slice, the window shifts so the focused row stays in view.
+  const windowStartRef = useRef(0);
   // Per-field "option cursor" — independent of the applied value. Initialized
   // to the applied option when this panel first opens (or settings hydrate).
   // ←/→ moves this cursor; Space applies cursor → settings.
@@ -260,6 +264,28 @@ export function SettingsPanel({
   }, [fieldIdx]);
 
   const field = FIELDS[fieldIdx]!;
+
+  // 3 content rows per field + marginBottom=1. Help text above costs 2 rows
+  // (1 text + marginBottom). `capacity` is how many fields fully fit; the
+  // render below doesn't stop at capacity though — anything past it is
+  // clipped naturally by the parent's height, so the user still gets a
+  // partial bottom field as a visual hint that more content exists.
+  const FIELD_ROWS = 4;
+  const availForFields = Math.max(FIELD_ROWS, height - 2);
+  const capacity = Math.max(1, Math.floor(availForFields / FIELD_ROWS));
+  let windowStart = windowStartRef.current;
+  if (FIELDS.length <= capacity) {
+    windowStart = 0;
+  } else {
+    if (fieldIdx < windowStart) windowStart = fieldIdx;
+    else if (fieldIdx >= windowStart + capacity) windowStart = fieldIdx - capacity + 1;
+    const maxStart = Math.max(0, FIELDS.length - capacity);
+    if (windowStart > maxStart) windowStart = maxStart;
+    if (windowStart < 0) windowStart = 0;
+  }
+  windowStartRef.current = windowStart;
+  const hasAbove = windowStart > 0;
+  const hasBelow = FIELDS.length - windowStart > capacity;
 
   useInput((input, key) => {
     if (!focused) return;
@@ -363,18 +389,24 @@ export function SettingsPanel({
   }
 
   return (
-    <Box flexDirection="column" width={width} height={height}>
+    <Box flexDirection="column" width={width} height={height} overflowY="hidden">
       <Box flexShrink={0} marginBottom={1}>
-        <Text dimColor>{t(lang, "settings.help")}</Text>
+        <Text dimColor>
+          {t(lang, "settings.help")}
+          {(hasAbove || hasBelow) && (
+            <Text>{"  "}{hasAbove ? "↑" : " "}{hasBelow ? "↓" : " "}</Text>
+          )}
+        </Text>
       </Box>
-      {FIELDS.map((f, i) => {
+      {FIELDS.slice(windowStart).map((f, vi) => {
+        const i = windowStart + vi;
         const fieldSelected = i === fieldIdx;
         const fieldFocused = fieldSelected && focused;
         return (
-          <Box key={fieldKey(f)} flexDirection="column" marginBottom={1}>
+          <Box key={fieldKey(f)} flexDirection="column" marginBottom={1} flexShrink={0}>
             {f.kind === "options" ? (
               <>
-                <Box>
+                <Box flexShrink={0}>
                   <Text color={fieldFocused ? ACCENT : undefined} bold={fieldFocused}>
                     {fieldFocused ? "› " : "  "}{f.title}
                   </Text>
@@ -422,18 +454,18 @@ function OptionsRow<F extends OptionsFieldDef>({
 }) {
   return (
     <>
-      <Box marginLeft={2} flexDirection="row" flexWrap="wrap">
+      <Box marginLeft={2} flexDirection="row" flexWrap="wrap" flexShrink={0}>
         {field.options.map((opt, oi) => {
           const isApplied = opt.value === applied;
           const isCursor = fieldFocused && oi === cursorIdx;
           return (
-            <Box key={String(opt.value)} marginRight={oi < field.options.length - 1 ? 2 : 0}>
+            <Box key={String(opt.value)} marginRight={oi < field.options.length - 1 ? 2 : 0} flexShrink={0}>
               <Option label={opt.label} applied={isApplied} cursor={isCursor} />
             </Box>
           );
         })}
       </Box>
-      <Box marginLeft={2}>
+      <Box marginLeft={2} flexShrink={0}>
         <Text dimColor>
           {field.options.find(o => o.value === applied)?.description ?? ""}
         </Text>

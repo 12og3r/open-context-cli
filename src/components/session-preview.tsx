@@ -500,18 +500,16 @@ export function SessionPreview({
       setCursor(0);
       setScrollLine(0);
     }
-    else if ((key.tab && !key.shift) || key.return) {
+    else if (key.return) {
       const target = pinToBottom ? lastIdx : effectiveCursor;
-      if (key.return) {
-        const role = messages[target]?.role;
-        // Enter on user/assistant rows opens the continue-conversation footer.
-        // Tool rows still toggle expansion as before.
-        if (role === "user" || role === "assistant") {
-          if (typeof messages[target]?.uuid === "string") setContinueOpen(true);
-          return;
-        }
-        if (role !== "tool_use" && role !== "tool_result") return;
+      const role = messages[target]?.role;
+      // Enter on user/assistant rows opens the continue-conversation footer.
+      // Tool rows toggle expansion.
+      if (role === "user" || role === "assistant") {
+        if (typeof messages[target]?.uuid === "string") setContinueOpen(true);
+        return;
       }
+      if (role !== "tool_use" && role !== "tool_result") return;
       setExpanded(prev => {
         const next = new Set(prev);
         if (next.has(target)) next.delete(target);
